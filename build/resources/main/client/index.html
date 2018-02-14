@@ -4,9 +4,14 @@
     <meta charset="UTF-8">
     <title>Title</title>
     <script>
-        var socket = new WebSocket("ws://localhost:8080/websocket");
-        socket.onopen = function() {
+        var socket = new WebSocket("ws://192.168.0.184:8080/websocket");
+        socket.onopen = function(event) {
+            console.log(event)
             socket.send("Test request");
+        }
+        socket.onerror = function(event) {
+            console.log(event);
+            console.log(event);
         }
         socket.onmessage = function(data) {
             console.log(event.data);

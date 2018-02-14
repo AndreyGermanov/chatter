@@ -12,10 +12,23 @@ object ChatApplication {
 
     lateinit var msgServer: MessageCenter
 
+    lateinit var dBServer: DB
+
     fun run() {
-        this.webServer = Javalin.create()
-        this.msgServer = MessageCenter()
-        this.webServer.enableStaticFiles("/var/www/html/public",Location.EXTERNAL)
-        this.webServer.port(8080).start()
+        this.dBServer = DB()
+        Users.application = this
+        webServer = Javalin.create()
+        webServer.port(8080)
+        webServer.enableStaticFiles("/var/www/html/public",Location.EXTERNAL)
+        msgServer = MessageCenter()
+        Users.loadUsers { _ ->
+            webServer.start()
+            webServer.get("/activate/:token", { res ->
+                Users.activateUser(res.param("token").toString())
+                res.status(200)
+                res.html("<html><head></head><body>Account activated. Please, login to Chatter</body></html>")
+            })
+
+        }
     }
 }
