@@ -82,7 +82,7 @@ object Users {
             val cursor = col.find(eq("login", params.get("login")))
             result.put("action","login_user")
             if (cursor.count() > 0) {
-                val doc = cursor.first();
+                val doc = cursor.first()
                 if (!doc.getBoolean("active")) {
                     result.put("status","error")
                     result.put("message","Pease, activate this account")
@@ -93,6 +93,21 @@ object Users {
                     callback(result)
                 } else {
                     result.put("user_id", doc.getString("_id"))
+                    if (doc.containsKey("first_name")) {
+                        result.put("first_name",doc.getString("first_name"))
+                    }
+                    if (doc.containsKey("last_name")) {
+                        result.put("last_name",doc.getString("last_name"))
+                    }
+                    if (doc.containsKey("gender")) {
+                        result.put("gender",doc.getString("gender"))
+                    }
+                    if (doc.containsKey("birthDate")) {
+                        result.put("birthDate",doc.getInteger("birthDate").toString())
+                    }
+                    if (doc.containsKey("default_room")) {
+                        result.put("default_room", doc.getString("default_room"))
+                    }
                     result.put("status", "ok")
                     if (findUserById(doc.getString("_id")) == null) {
                         val user = User(login = doc.getString("login"), email = doc.getString("email"), id = doc.getString("_id"), password = doc.getString("password"))
@@ -117,7 +132,38 @@ object Users {
         } else {
             return null
         }
+    }
 
-
+    public fun updateUser(params: JSONObject,callback: (HashMap<String,String>) -> Unit ) {
+        var col = this.application.dBServer.db.getCollection("users")
+        var result = HashMap<String, String>()
+        result.put("action","update_user_profile")
+        result.put("user_id",params.get("user_id").toString())
+        launch {
+            if (col.find(eq("_id", params.get("user_id"))).count() > 0) {
+                val doc = Document()
+                if (params.containsKey("first_name")) {
+                    doc.append("first_name", params.get("first_name"))
+                }
+                if (params.containsKey("last_name")) {
+                    doc.append("last_name",params.get("last_name"))
+                }
+                if (params.containsKey("gender")) {
+                    doc.append("gender",params.get("gender"))
+                }
+                if (params.containsKey("birthDate")) {
+                    doc.append("birthDate",Integer.parseInt(params.get("birthDate").toString()))
+                }
+                if (params.containsKey("default_room")) {
+                    doc.append("default_room",params.get("default_room"))
+                }
+                col.updateOne(eq("_id",params.get("user_id")),Document("\$set",doc))
+                result.put("status","ok")
+            } else {
+                result.put("status","error")
+                result.put("message","User not found")
+            }
+            callback(result)
+        }
     }
 }

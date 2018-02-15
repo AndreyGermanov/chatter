@@ -49,6 +49,18 @@ class MessageObject : WebSocketListener {
                            session.remote.sendString(result_obj.toString())
                        }
                    }
+                   "update_user" -> {
+                       Users.updateUser(obj) { result ->
+                           val result_obj: JSONObject = JSONObject()
+                           val it = result.iterator()
+                           while (it.hasNext()) {
+                               var item = it.next();
+                               result_obj.set(item.key,item.value)
+                           }
+                           result_obj.set("request_id",obj.get("request_id"))
+                           session.remote.sendString(result_obj.toString())
+                       }
+                   }
                }
             } else {
                 session.remote.sendString("HELLO!")
