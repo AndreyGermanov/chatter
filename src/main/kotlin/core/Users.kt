@@ -12,6 +12,9 @@ import org.json.simple.JSONObject
 import java.util.*
 import utils.BCrypt
 import utils.SendMail
+import java.io.FileInputStream
+import java.nio.file.Files
+import java.nio.file.Paths
 
 object Users {
 
@@ -164,6 +167,17 @@ object Users {
                 result.put("message","User not found")
             }
             callback(result)
+        }
+    }
+
+    public fun getUserProfileImage(user_id:String,callback:(byteArray:ByteArray?) -> Unit) {
+        launch {
+            if (Files.exists(Paths.get("opt/chatter/users/" + user_id + "/profile.png"))) {
+                val fs = FileInputStream("opt/chatter/users/" + user_id + "/profile.png")
+                callback(fs.readBytes())
+            } else {
+                callback(null)
+            }
         }
     }
 }
