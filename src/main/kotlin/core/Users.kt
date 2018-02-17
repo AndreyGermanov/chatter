@@ -66,6 +66,12 @@ object Users {
                 result.set("request_id",params.get("request_id").toString())
                 result.set("status","ok")
                 result.set("message","Check email to activate your account")
+                var user = User(
+                        login = doc["login"].toString(),
+                        password = doc["password"].toString(),
+                        email = doc["email"].toString(),
+                        id = doc["_id"].toString())
+                _users.add(user)
                 callback(result)
             }
         }

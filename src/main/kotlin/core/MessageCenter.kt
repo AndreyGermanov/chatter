@@ -6,8 +6,10 @@ import io.javalin.embeddedserver.jetty.websocket.WebSocketConfig
 import io.javalin.embeddedserver.jetty.websocket.WsSession
 import io.javalin.embeddedserver.jetty.websocket.WebSocketHandler
 import kotlinx.coroutines.experimental.launch
+import models.User
 import org.eclipse.jetty.websocket.api.Session
 import org.eclipse.jetty.websocket.api.WebSocketListener
+import org.json.simple.JSONArray
 import org.json.simple.parser.JSONParser
 import org.json.simple.JSONObject
 import java.io.FileOutputStream
@@ -19,10 +21,8 @@ import java.nio.file.Paths
 import java.util.zip.Adler32
 
 class MessageObject : WebSocketListener {
-
     lateinit var session: Session
-    var file_requests = HashMap<Long,Any>()
-    var requests: HashMap<String,Any> = HashMap<String,Any>()
+    var msgCenter = ChatApplication.msgServer
 
     override public fun onWebSocketError(cause: Throwable) {
     }
@@ -42,6 +42,15 @@ class MessageObject : WebSocketListener {
                                 result_obj.set(item.key,item.value)
                             }
                             result_obj.set("request_id",obj.get("request_id"))
+                            if (!msgCenter.user_sessions.containsKey(result_obj.get("user_id").toString())) {
+                                val user = User(id=result_obj.get("user_id").toString(),
+                                        login = obj.get("login").toString(),
+                                        password=obj.get("password").toString(),
+                                        default_room = obj.get("default_room").toString(),
+                                        email = obj.get("email").toString()
+                                        )
+                                msgCenter.user_sessions.set(user.id,user)
+                            }
                             session.remote.sendString(result_obj.toString())
                         }
                    }
@@ -51,20 +60,36 @@ class MessageObject : WebSocketListener {
                            val it = result.iterator()
                            while (it.hasNext()) {
                                var item = it.next();
-                               result_obj.set(item.key,item.value)
+                               result_obj.set(item.key, item.value)
                            }
-                           result_obj.set("request_id",obj.get("request_id"))
-                           Users.getUserProfileImage(result_obj.get("user_id").toString()) { image ->
-                               if (image != null) {
-                                   val checksumSystem = Adler32()
-                                   checksumSystem.update(image)
-                                   val checksum = checksumSystem.value
-                                   result_obj.set("checksum",checksum)
-                                   session.remote.sendString(result_obj.toString())
-                                   session.remote.sendBytes(ByteBuffer.wrap(image))
-                               } else {
-                                   session.remote.sendString(result_obj.toString())
+                           result_obj.set("request_id", obj.get("request_id"))
+                           if (result_obj.containsKey("user_id")) {
+                               Users.getUserProfileImage(result_obj.get("user_id").toString()) { image ->
+                                   if (image != null) {
+                                       val checksumSystem = Adler32()
+                                       checksumSystem.update(image)
+                                       val checksum = checksumSystem.value
+                                       result_obj.set("checksum", checksum)
+                                       val rooms = Rooms.getRooms()
+                                       val roomsArray = JSONArray()
+                                       var counter = 0;
+                                       for (room in rooms) {
+                                           val roomObj = JSONObject()
+                                           roomObj.set("id", room.key)
+                                           roomObj.set("name", room.value)
+                                           roomsArray.add(counter++, roomObj)
+                                       }
+                                       result_obj.set("rooms", roomsArray)
+                                       session.remote.sendString(result_obj.toString())
+                                       session.remote.sendBytes(ByteBuffer.wrap(image))
+                                   } else {
+                                       session.remote.sendString(result_obj.toString())
+                                   }
+                                   msgCenter.user_sessions.get(result_obj.get("user_id").toString())!!.loginTime = (System.currentTimeMillis()/1000).toInt()
+                                   msgCenter.user_sessions.get(result_obj.get("user_id").toString())!!.lastActivityTime = (System.currentTimeMillis()/1000).toInt()
                                }
+                           } else {
+                               session.remote.sendString(result_obj.toString())
                            }
                        }
                    }
@@ -77,8 +102,17 @@ class MessageObject : WebSocketListener {
                                result_obj.set(item.key,item.value)
                            }
                            result_obj.set("request_id",obj.get("request_id"))
+                           if (msgCenter.user_sessions.containsKey(obj.get("user_id"))) {
+                               val user = msgCenter.user_sessions.get(obj.get("user_id").toString())!!
+                               user.first_name = obj.get("first_name").toString()
+                               user.last_name = obj.get("last_name").toString()
+                               user.gender = obj.get("gender").toString()
+                               user.birthDate = Integer.parseInt(obj.get("birthDate").toString())
+                               user.default_room = obj.get("default_room").toString()
+                               msgCenter.user_sessions.set(obj.get("user_id").toString(),user)
+                           }
                            if (obj.containsKey("checksum")) {
-                               file_requests.set(obj.get("checksum").toString().toLong(),result_obj)
+                               msgCenter.file_requests.set(obj.get("checksum").toString().toLong(),result_obj)
                            } else {
                                session.remote.sendString(result_obj.toString())
                            }
@@ -107,20 +141,25 @@ class MessageObject : WebSocketListener {
             var checkSumEngine = Adler32()
             checkSumEngine.update(payload)
             val checksum = checkSumEngine.value
-            if (file_requests.containsKey(checksum)) {
-                var request = file_requests.get(checksum) as JSONObject
+            if (msgCenter.file_requests.containsKey(checksum)) {
+                var request = msgCenter.file_requests.get(checksum) as JSONObject
                 Files.createDirectories(Paths.get("opt/chatter/users/"+request.get("user_id").toString()))
                 var fs: FileOutputStream = FileOutputStream("opt/chatter/users/"+request.get("user_id")+"/profile.png",false)
                 fs.write(payload)
                 fs.close()
                 session.remote.sendString(request.toString())
-                file_requests.remove(checksum)
+                msgCenter.file_requests.remove(checksum)
             }
         }
     }
 }
 
 class MessageCenter {
+
+    var file_requests = HashMap<Long,Any>()
+    var requests: HashMap<String,Any> = HashMap<String,Any>()
+    var user_sessions = HashMap<String, User>()
+    var pending_events = HashMap<Int,JSONObject>()
 
     init {
         val srv: Javalin = ChatApplication.webServer
