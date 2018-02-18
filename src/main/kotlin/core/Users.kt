@@ -28,12 +28,14 @@ object Users {
             val cursor: MongoCursor<Document> = col.find().iterator()
             while (cursor.hasNext()) {
                 val doc = cursor.next()
+                /*
                 var user = User(
                         login = doc["login"].toString(),
                         password = doc["password"].toString(),
                         email = doc["email"].toString(),
                         id = doc["id"].toString())
                 _users.add(user)
+                */
             }
             callback(_users)
         }
@@ -66,12 +68,14 @@ object Users {
                 result.set("request_id",params.get("request_id").toString())
                 result.set("status","ok")
                 result.set("message","Check email to activate your account")
+                /*
                 var user = User(
                         login = doc["login"].toString(),
                         password = doc["password"].toString(),
                         email = doc["email"].toString(),
                         id = doc["_id"].toString())
                 _users.add(user)
+                */
                 callback(result)
             }
         }
@@ -119,8 +123,8 @@ object Users {
                     }
                     result.put("status", "ok")
                     if (findUserById(doc.getString("_id")) == null) {
-                        val user = User(login = doc.getString("login"), email = doc.getString("email"), id = doc.getString("_id"), password = doc.getString("password"))
-                        _users.add(user)
+                  //      val user = User(login = doc.getString("login"), email = doc.getString("email"), id = doc.getString("_id"), password = doc.getString("password"))
+                    //    _users.add(user)
                     }
                     callback(result)
                 }
@@ -133,14 +137,15 @@ object Users {
     }
 
     public fun findUserById(id:String): User? {
-        val results = _users.filter {
-            it.id == id
-        }
-        if (results.count()>0) {
-            return results.first()
-        } else {
-            return null
-        }
+        //val results = _users.filter {
+            //it.id == id
+        //}
+        //if (results.count()>0) {
+          //  return results.first()
+        //} else {
+          //  return null
+        //}
+        return null
     }
 
     public fun updateUser(params: JSONObject,callback: (HashMap<String,String>) -> Unit ) {

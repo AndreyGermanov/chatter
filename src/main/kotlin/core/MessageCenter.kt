@@ -43,6 +43,7 @@ class MessageObject : WebSocketListener {
                             }
                             result_obj.set("request_id",obj.get("request_id"))
                             if (!msgCenter.user_sessions.containsKey(result_obj.get("user_id").toString())) {
+                                /*
                                 val user = User(id=result_obj.get("user_id").toString(),
                                         login = obj.get("login").toString(),
                                         password=obj.get("password").toString(),
@@ -50,6 +51,7 @@ class MessageObject : WebSocketListener {
                                         email = obj.get("email").toString()
                                         )
                                 msgCenter.user_sessions.set(user.id,user)
+                                        */
                             }
                             session.remote.sendString(result_obj.toString())
                         }
@@ -85,8 +87,8 @@ class MessageObject : WebSocketListener {
                                    } else {
                                        session.remote.sendString(result_obj.toString())
                                    }
-                                   msgCenter.user_sessions.get(result_obj.get("user_id").toString())!!.loginTime = (System.currentTimeMillis()/1000).toInt()
-                                   msgCenter.user_sessions.get(result_obj.get("user_id").toString())!!.lastActivityTime = (System.currentTimeMillis()/1000).toInt()
+                                   //msgCenter.user_sessions.get(result_obj.get("user_id").toString())!!.loginTime = (System.currentTimeMillis()/1000).toInt()
+                                   //msgCenter.user_sessions.get(result_obj.get("user_id").toString())!!.lastActivityTime = (System.currentTimeMillis()/1000).toInt()
                                }
                            } else {
                                session.remote.sendString(result_obj.toString())
@@ -104,11 +106,13 @@ class MessageObject : WebSocketListener {
                            result_obj.set("request_id",obj.get("request_id"))
                            if (msgCenter.user_sessions.containsKey(obj.get("user_id"))) {
                                val user = msgCenter.user_sessions.get(obj.get("user_id").toString())!!
+                               /*
                                user.first_name = obj.get("first_name").toString()
                                user.last_name = obj.get("last_name").toString()
                                user.gender = obj.get("gender").toString()
                                user.birthDate = Integer.parseInt(obj.get("birthDate").toString())
                                user.default_room = obj.get("default_room").toString()
+                               */
                                msgCenter.user_sessions.set(obj.get("user_id").toString(),user)
                            }
                            if (obj.containsKey("checksum")) {

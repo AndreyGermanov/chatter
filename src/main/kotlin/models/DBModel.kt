@@ -3,31 +3,27 @@ package models
 import com.mongodb.client.MongoDatabase
 import com.mongodb.client.model.UpdateOptions
 import core.ChatApplication
+import interactors.DBCollection
 import kotlinx.coroutines.experimental.launch
 import org.bson.Document
 import org.bson.types.ObjectId
+import org.json.simple.JSONObject
 import org.omg.CORBA.Object
 
-/*
-*   Interface, which must implement all database models
-*/
-interface AbstractDBModel {
-    operator fun get (index:String): Any?
-    operator fun set (index:String,value:Any)
-    fun save (callback:()->Unit)
-    fun load (callback:(result:Boolean)->Unit)
-    fun getDBSchema(): HashMap<String,String>
-}
-
-
-/*
-* Base class for database record in MongoDB collection named [colName]
-* in [db] database
-*/
-class DBModel(db:MongoDatabase,colName:String): AbstractDBModel {
+/**
+ * Base wrapper class for database Model, stored in MongoDB database
+ *
+ * @param db Link to MongoDB database, which holds collection
+ * @param colName Name of MongoDB collection
+ *
+ * @property schema Description of schema of this collection. Schema is HashMap<Field,Type> where Field is field of
+ *                    model and Type is Java type of model (Int, String, Boolean, Any)
+ * @property doc JSON document, which contains actual collection data
+ */
+open class DBModel(db:MongoDatabase,colName:String) {
 
     private var doc = Document()
-    var schema = HashMap<String,String>()
+    open var schema = HashMap<String,String>()
     var collectionName:String
     var db:MongoDatabase
 
@@ -36,10 +32,13 @@ class DBModel(db:MongoDatabase,colName:String): AbstractDBModel {
         this.db = db
     }
 
-    /*
-    *  Operator which returns field of record in format record[[index]]
+    /**
+     *  Operator which returns field of record in format record[index]
+     *
+     * @param index Index of field
+     * @return field of model specified by inedx
     */
-    override operator fun get (index:String) : Any? {
+    operator fun get (index:String) : Any? {
         if (doc.contains(index)) {
             return doc.get(index)
         } else {
@@ -47,10 +46,13 @@ class DBModel(db:MongoDatabase,colName:String): AbstractDBModel {
         }
     }
 
-    /*
-    * Operator to set field of record in format record[[index]]
-    */
-    override operator fun set(index:String,value:Any) {
+    /**
+     * Operator to set field of record in format record[index]
+     *
+     * @param index Index of field
+     * @param value Value of field
+     */
+    operator fun set(index:String,value:Any) {
         if (schema.contains(index)) {
             when (schema.get(index)) {
                 "Int" -> doc.set(index, Integer.parseInt(value.toString()))
@@ -63,21 +65,21 @@ class DBModel(db:MongoDatabase,colName:String): AbstractDBModel {
         }
     }
 
-    /*
-    * Operator which inserts or updates current record in database in async mode
-    * and runs [callback] after this
-    */
-    override fun save(callback:()->Unit) {
+    /**
+     * Operator which inserts or updates current record in database in async mode
+     * and runs [callback] after this
+     */
+    fun save(callback:()->Unit) {
         var col = db.getCollection(collectionName)
         col.updateOne(Document("_id", doc.get("_id")), Document("\$set", doc), UpdateOptions().upsert(true))
         callback()
     }
 
-    /*
-    * Operator which loads current record from database, using "_id" field of current document
-    * and returns [callback] with result of operation in [result] field.
-    */
-    override fun load(callback: (result:Boolean) -> Unit) {
+    /**
+     * Operator which loads current record from database, using "_id" field of current document
+     * and returns [callback] with result of operation in [result] field.
+     */
+    fun load(callback: (result:Boolean) -> Unit) {
         var col = db.getCollection(collectionName)
         if (doc.contains("_id")) {
             val result = col.find(Document("_id",doc.get("_id")))
@@ -89,10 +91,42 @@ class DBModel(db:MongoDatabase,colName:String): AbstractDBModel {
         }
     }
 
-    /*
-    *   Returns schema of this model
-    */
-    override fun getDBSchema(): HashMap<String,String> {
+    /**
+     *   Returns schema of this model, which defines possible fields and their types
+     *   @return HashMap with schema of models of current class
+     */
+    fun getDBSchema(): HashMap<String,String> {
         return this.schema
+    }
+
+    /**
+     *  Fills fields of model using provided JSON document and then adds
+     *  filled document to provided collection, if it does not exist in it
+     *
+     *  @param doc Source JSON document
+     *  @param collection Destination collection
+     */
+    fun addFromJSON(doc:Document,collection: DBCollection) {
+        val schema = this.getDBSchema().iterator()
+        for (row in schema) {
+            if (doc.contains(row.key)) {
+                this[row.key] = doc[row.key]!!
+            }
+        }
+        val items = collection.getList()
+        if (items.filter {
+            val obj = it as DBModel
+            obj["_id"] == this["_id"]
+        }.count()==0) {
+            collection.addModel(this)
+        }
+    }
+
+    /**
+     * Returns string representation of model
+     * @return String representation of model
+     */
+    override fun toString() : String {
+        return doc.toString()
     }
 }

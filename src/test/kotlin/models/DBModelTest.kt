@@ -4,8 +4,10 @@ import org.junit.Before
 import org.junit.Test
 import core.ChatApplication
 import core.DB
+import interactors.DBCollection
 import org.bson.Document
 import org.bson.types.ObjectId
+import org.json.simple.JSONObject
 import org.junit.After
 
 import org.junit.Assert.*
@@ -92,6 +94,29 @@ class DBModelTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun addFromJSON() {
+        var dbcol = DBCollection(model.db,model.collectionName)
+        val obj = Document()
+        obj.set("_id",model["_id"])
+        obj.set("intField",15)
+        obj.set("stringField","Str")
+        obj.set("boolField",false)
+        obj.set("unknown",13)
+        model.addFromJSON(obj,dbcol)
+        assertEquals("Add string from JSON","Str",model["stringField"])
+        assertEquals("Add Integer from JSON",15,model["intField"])
+        assertEquals("Add Boolean from JSON",false,model["boolField"])
+        assertEquals("Add not specified in schemafield from JSON",null,model["unknown"])
+        assertEquals("Getting added by JSON model from collection",1,dbcol.count())
+        val newModel = dbcol.getByIndex(0)!! as DBModel
+        assertEquals("Getting added by JSON model string from JSON","Str",model["stringField"])
+        assertEquals("Getting added by JSON model Integer from JSON",15,model["intField"])
+        assertEquals("Getting added by JSON model Boolean from JSON",false,model["boolField"])
+        newModel.addFromJSON(obj,dbcol)
+        assertEquals("Duplicate item in collection",1,dbcol.count())
     }
 
     @After

@@ -16,7 +16,7 @@ object ChatApplication {
 
     fun run() {
         this.dBServer = DB()
-        Users.application = this
+        //Users.application = this
         Rooms.application = this
         webServer = Javalin.create()
         webServer.port(8080)
@@ -29,7 +29,7 @@ object ChatApplication {
                 res.status(200)
                 res.html("<html><head></head><body>Account activated. Please, login to Chatter</body></html>")
                 if (msgServer.user_sessions.containsKey(res.param("token").toString())) {
-                    msgServer.user_sessions.get(res.param("token").toString())!!.active = true
+                    //msgServer.user_sessions.get(res.param("token").toString())!!.active = true
                 }
             })
 
