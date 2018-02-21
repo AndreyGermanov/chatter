@@ -28,13 +28,14 @@ class MessageObject : WebSocketListener {
     }
 
     override public fun onWebSocketText(message: String?) {
+        /*
         if (message != null) {
             val parser = JSONParser()
             val obj: JSONObject = parser.parse(message) as JSONObject
             if (obj.containsKey("request_id")) {
                when (obj.get("action")) {
                    "register_user" -> {
-                        Users.registerUser(obj) { result ->
+                        UsersOld.registerUser(obj) { result ->
                             val result_obj: JSONObject = JSONObject()
                             val it = result.iterator()
                             while (it.hasNext()) {
@@ -57,7 +58,7 @@ class MessageObject : WebSocketListener {
                         }
                    }
                    "login_user" -> {
-                       Users.loginUser(obj) { result ->
+                       UsersOld.loginUser(obj) { result ->
                            val result_obj: JSONObject = JSONObject()
                            val it = result.iterator()
                            while (it.hasNext()) {
@@ -66,13 +67,13 @@ class MessageObject : WebSocketListener {
                            }
                            result_obj.set("request_id", obj.get("request_id"))
                            if (result_obj.containsKey("user_id")) {
-                               Users.getUserProfileImage(result_obj.get("user_id").toString()) { image ->
+                               UsersOld.getUserProfileImage(result_obj.get("user_id").toString()) { image ->
                                    if (image != null) {
                                        val checksumSystem = Adler32()
                                        checksumSystem.update(image)
                                        val checksum = checksumSystem.value
                                        result_obj.set("checksum", checksum)
-                                       val rooms = Rooms.getRooms()
+                                       val rooms = RoomsOld.getRooms()
                                        val roomsArray = JSONArray()
                                        var counter = 0;
                                        for (room in rooms) {
@@ -96,7 +97,7 @@ class MessageObject : WebSocketListener {
                        }
                    }
                    "update_user" -> {
-                       Users.updateUser(obj) { result ->
+                       UsersOld.updateUser(obj) { result ->
                            val result_obj: JSONObject = JSONObject()
                            val it = result.iterator()
                            while (it.hasNext()) {
@@ -127,6 +128,7 @@ class MessageObject : WebSocketListener {
                 session.remote.sendString("HELLO!")
             }
         }
+        */
     }
 
     override public fun onWebSocketConnect(session: Session?) {
@@ -149,6 +151,7 @@ class MessageObject : WebSocketListener {
                 var request = msgCenter.file_requests.get(checksum) as JSONObject
                 Files.createDirectories(Paths.get("opt/chatter/users/"+request.get("user_id").toString()))
                 var fs: FileOutputStream = FileOutputStream("opt/chatter/users/"+request.get("user_id")+"/profile.png",false)
+
                 fs.write(payload)
                 fs.close()
                 session.remote.sendString(request.toString())

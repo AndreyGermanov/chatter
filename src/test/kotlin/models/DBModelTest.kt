@@ -1,3 +1,7 @@
+/**
+ * Created by andrey on 2/17/18.
+ */
+
 package models
 
 import org.junit.Before
@@ -12,15 +16,13 @@ import org.junit.After
 
 import org.junit.Assert.*
 
-/**
- * Created by andrey on 2/17/18.
- */
 class DBModelTest {
+
     lateinit var model:DBModel
 
     @Before
     fun setUp() {
-        ChatApplication.dBServer = DB()
+        ChatApplication.dBServer = DB("test")
         model = DBModel(ChatApplication.dBServer.db,"test")
         model.schema = mapOf("_id" to "Any", "intField" to "Int", "boolField" to "Boolean", "stringField" to "String") as HashMap<String,String>
         model["_id"] = ObjectId.get()
@@ -117,6 +119,15 @@ class DBModelTest {
         assertEquals("Getting added by JSON model Boolean from JSON",false,model["boolField"])
         newModel.addFromJSON(obj,dbcol)
         assertEquals("Duplicate item in collection",1,dbcol.count())
+    }
+
+    @Test
+    fun remove() {
+        model.remove {
+            var col = ChatApplication.dBServer.db.getCollection("test")
+            assertEquals("Remove model from DB ",0,col.find(Document("_id",model["_id"])).count())
+            model.save{}
+        }
     }
 
     @After

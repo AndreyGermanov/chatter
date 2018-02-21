@@ -31,7 +31,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
 
     var collectionName = ""
     var db:MongoDatabase
-    private val models: ArrayList<Any> = ArrayList<Any>()
+    protected var models: ArrayList<Any> = ArrayList<Any>()
     var currentItem = 0
 
     var schema: HashMap<String,String>? = null
@@ -66,8 +66,15 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     *
     *   @param model Model to add
     */
-    fun addModel(model:Any) {
-        models.add(model)
+    open fun addModel(model:Any) {
+        var dbmodel = model as DBModel
+        var items = models.filter {
+            var item = it as DBModel
+            item["_id"] == dbmodel["_id"]
+        }
+        if (items.count() == 0) {
+            models.add(model)
+        }
     }
 
     /**
@@ -77,7 +84,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     *   @param condition filtering condition
     *   @param callback callback function
     */
-    fun loadList(condition: Document?, callback:()->Unit) {
+    open fun loadList(condition: Document?, callback:()->Unit) {
         val col = db.getCollection(collectionName)
         models.clear()
             var result: FindIterable<Document>
@@ -86,7 +93,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             } else {
                 result = col.find()
             }
-            if (result.count()>0) {
+            if (result.count() > 0) {
                 val docs = result.iterator()
                 for (doc in docs) {
                     addItem(doc)
@@ -156,6 +163,59 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             return result.first()
         } else {
             return null
+        }
+    }
+
+    /**
+     * Returns models, which meet provided condition ([field] equals [value]
+     *
+     * @param field Name of condition field
+     * @param value value of condition field
+     * @return array of matched items or null if no items found
+     */
+    fun getListBy(field:String,value:Any): ArrayList<Any>? {
+        val result = models.filter {
+            val model = it as DBModel
+            it[field] == value
+        }
+        if (result.count() > 0) {
+            return result as ArrayList<Any>
+        } else {
+            return null
+        }
+    }
+
+    /**
+     * Returs first model in collection, which meets provided criteria ([field] equals [value])
+     *
+     * @param field Name of condition field
+     * @param value Value of condition field
+     * @return matched model or null if no matches
+     */
+    fun getBy(field:String,value:Any): DBModel? {
+        val result = getListBy(field,value)
+        if (result == null) {
+            return null
+        } else {
+            return result.first() as DBModel
+        }
+    }
+
+    /**
+     * Remove model with specified ID
+     * @param id MongoDB _id field of model to remove
+     * @param callback callback function after operation completed
+     */
+    fun remove(id:String,callback:(status:Boolean)->Unit) {
+        val obj = getById(id)
+        if (obj == null) {
+            callback(false)
+        } else {
+            val model = obj as DBModel
+            model.remove {
+                models.remove(model)
+                callback(true)
+            }
         }
     }
 

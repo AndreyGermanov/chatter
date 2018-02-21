@@ -26,6 +26,7 @@ open class DBModel(db:MongoDatabase,colName:String) {
     open var schema = HashMap<String,String>()
     var collectionName:String
     var db:MongoDatabase
+    var app = ChatApplication
 
     init {
         collectionName = colName
@@ -69,9 +70,13 @@ open class DBModel(db:MongoDatabase,colName:String) {
      * Operator which inserts or updates current record in database in async mode
      * and runs [callback] after this
      */
-    fun save(callback:()->Unit) {
+    open fun save(callback:()->Unit) {
         var col = db.getCollection(collectionName)
-        col.updateOne(Document("_id", doc.get("_id")), Document("\$set", doc), UpdateOptions().upsert(true))
+        var id = doc.get("_id")
+        if (id==null) {
+            id = ObjectId.get()
+        }
+        col.updateOne(Document("_id", id), Document("\$set", doc), UpdateOptions().upsert(true))
         callback()
     }
 
@@ -79,7 +84,7 @@ open class DBModel(db:MongoDatabase,colName:String) {
      * Operator which loads current record from database, using "_id" field of current document
      * and returns [callback] with result of operation in [result] field.
      */
-    fun load(callback: (result:Boolean) -> Unit) {
+    open fun load(callback: (result:Boolean) -> Unit) {
         var col = db.getCollection(collectionName)
         if (doc.contains("_id")) {
             val result = col.find(Document("_id",doc.get("_id")))
@@ -87,8 +92,21 @@ open class DBModel(db:MongoDatabase,colName:String) {
                 callback(false)
             } else {
                 doc = result.first()
+                callback(true)
             }
+        } else {
+            callback(false)
         }
+    }
+
+    /**
+     * Removes current model from MongoDB database
+     * @param callback Callback function after complete
+     */
+    fun remove(callback: () -> Unit) {
+        var col = db.getCollection(collectionName)
+        col.deleteOne(Document("_id",doc["_id"]))
+        callback()
     }
 
     /**
@@ -106,7 +124,7 @@ open class DBModel(db:MongoDatabase,colName:String) {
      *  @param doc Source JSON document
      *  @param collection Destination collection
      */
-    fun addFromJSON(doc:Document,collection: DBCollection) {
+    open fun addFromJSON(doc:Document,collection: DBCollection) {
         val schema = this.getDBSchema().iterator()
         for (row in schema) {
             if (doc.contains(row.key)) {

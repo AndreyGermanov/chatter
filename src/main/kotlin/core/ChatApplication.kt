@@ -1,4 +1,7 @@
 package core
+import interactors.Rooms
+import interactors.Sessions
+import interactors.Users
 import io.javalin.Javalin
 import io.javalin.embeddedserver.Location
 
@@ -14,18 +17,31 @@ object ChatApplication {
 
     lateinit var dBServer: DB
 
+    lateinit var users: Users
+
+    lateinit var sessions: Sessions
+
+    lateinit var rooms: Rooms
+
+    var rootPath = "opt/chatter"
+
+    var usersPath = rootPath + "/users"
+
     fun run() {
         this.dBServer = DB()
-        //Users.application = this
-        Rooms.application = this
+
+        this.users = Users(this.dBServer.db)
+
+        //RoomsOld.application = this
         webServer = Javalin.create()
         webServer.port(8080)
         webServer.enableStaticFiles("/var/www/html/public",Location.EXTERNAL)
         msgServer = MessageCenter()
-        Rooms.loadRooms { ->
+        /*
+        RoomsOld.loadRooms { ->
             webServer.start()
             webServer.get("/activate/:token", { res ->
-                Users.activateUser(res.param("token").toString())
+                UsersOld.activateUser(res.param("token").toString())
                 res.status(200)
                 res.html("<html><head></head><body>Account activated. Please, login to Chatter</body></html>")
                 if (msgServer.user_sessions.containsKey(res.param("token").toString())) {
@@ -34,5 +50,6 @@ object ChatApplication {
             })
 
         }
+        */
     }
 }

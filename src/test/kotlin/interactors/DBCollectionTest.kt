@@ -18,16 +18,26 @@ class DBCollectionTest {
     lateinit var dbcol: DBCollection
     lateinit var db:MongoDatabase
     lateinit var model:DBModel
+    lateinit var schema:HashMap<String,String>
+    val colName = "test"
+    val dbName = "test"
 
     @Before
     fun setUp() {
-        ChatApplication.dBServer = DB()
+        ChatApplication.dBServer = DB(dbName)
         db = ChatApplication.dBServer.db
-        dbcol = DBCollection(ChatApplication.dBServer.db,"test")
-        model = DBModel(db,"test")
-        model.schema = mapOf("_id" to "Any", "intField" to "Int", "boolField" to "Boolean", "stringField" to "String") as HashMap<String,String>
+        dbcol = DBCollection(ChatApplication.dBServer.db,colName)
+        model = DBModel(db,colName)
+        schema = mapOf("_id" to "Any", "intField" to "Int", "boolField" to "Boolean", "stringField" to "String") as HashMap<String,String>
+        model.schema = schema
         dbcol.schema = model.schema
     }
+
+    @After
+    fun tearDown() {
+        db.getCollection(colName).deleteMany(Document())
+    }
+
 
     fun addDemoData(callback:()->Unit) {
         model["_id"] = "123456"
@@ -51,11 +61,6 @@ class DBCollectionTest {
         }
     }
 
-    @After
-    fun tearDown() {
-       db.getCollection("test").deleteMany(Document())
-    }
-
     @Test
     fun addItem() {
         val doc = Document()
@@ -73,7 +78,17 @@ class DBCollectionTest {
 
     @Test
     fun addModel() {
-
+        assertEquals("Before add new model to collection",0,dbcol.count())
+        val dbmodel = DBModel(db,colName)
+        dbmodel.schema = schema
+        dbmodel["_id"] = "78901234"
+        dbmodel["boolValue"] = false
+        dbmodel["stringValue"] = "Test"
+        dbmodel["intValue"] = 15
+        dbcol.addModel(dbmodel)
+        assertEquals("Add new model to collection",1,dbcol.count())
+        dbcol.addModel(dbmodel)
+        assertEquals("Add duplicate model to collection",1,dbcol.count())
     }
 
     @Test
@@ -160,6 +175,45 @@ class DBCollectionTest {
             dbcol.loadList(null) {
                 val item = dbcol.getById("987654321") as DBModel
                 assertNotEquals("Get item by id",null,item)
+            }
+        }
+    }
+
+    @Test
+    fun getListBy() {
+        addDemoData {
+            dbcol.loadList(null) {
+                var items = dbcol.getListBy("boolField",true)
+                assertEquals("Get model list by condition",2,items!!.count())
+                items = dbcol.getListBy("fdfgdw",222)
+                assertEquals("Get model list by condition",null,items)
+            }
+        }
+    }
+
+    @Test
+    fun getBy() {
+        addDemoData {
+            dbcol.loadList(null) {
+                var item = dbcol.getBy("stringField","Test 3") as DBModel?
+                assertEquals("Get model by condition","new_id",item!!["_id"])
+                item = dbcol.getBy("_id","123456") as DBModel?
+                assertEquals("Get model by condition",item!!["intField"],35)
+                item = dbcol.getBy("gd33r","3sdg") as DBModel?
+                assertEquals("Get unknown model by id",null,item)
+            }
+        }
+    }
+
+    @Test
+    fun remove() {
+        addDemoData {
+            dbcol.loadList(null) {
+                dbcol.remove("987654321") {
+                    val col = db.getCollection(colName)
+                    assertEquals("Remove model from MongoDB database",0,col.find(Document("_id","987654321")).count())
+                    assertEquals("Remove model from collection",null, dbcol.getById("987654321"))
+                }
             }
         }
     }
