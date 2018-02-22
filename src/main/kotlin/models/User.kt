@@ -19,18 +19,11 @@ import java.util.zip.Adler32
  * @property schema Schema of user model used to control which fields can exist in database
  */
 class User(db:MongoDatabase,colName:String) : DBModel(db,colName) {
-    override var schema = mapOf(
-            "_id" to "String",
-            "login" to "String",
-            "password" to "String",
-            "email" to "String",
-            "default_room" to "String",
-            "active" to "Boolean",
-            "first_name" to "String",
-            "last_name" to "String",
-            "gender" to "String",
-            "birthDate" to "Int"
-    ) as HashMap<String,String>
+
+    /**
+     * Link to database schema from collection
+     */
+    override var schema = app.users.schema
 
     /**
      * Function returns user account activation status: true or false

@@ -21,13 +21,10 @@ import java.io.IOException
  */
 class Session(db:MongoDatabase,colName:String="sessions",user:User) : DBModel(db,colName) {
 
-    override var schema = mapOf(
-            "_id" to "String",
-            "user_id" to "String",
-            "loginTime" to "Int",
-            "lastActiveTime" to "Int",
-            "room" to "String"
-    ) as HashMap<String,String>
+    /**
+     * Link to schema of database models from collection
+     */
+    override var schema = app.sessions.schema
 
     var user: User
 
@@ -98,10 +95,12 @@ class Session(db:MongoDatabase,colName:String="sessions",user:User) : DBModel(db
             callback()
             return
         }
-        val room = app.rooms.getById(this["room"].toString())
-        if (room == null) {
-            callback()
-            return
+        if (this["room"].toString()!="" && this["room"] != null) {
+            val room = app.rooms.getById(this["room"].toString())
+            if (room == null) {
+                callback()
+                return
+            }
         }
         val condition = Document("user_id",this["user_id"])
         condition.set("_id",Document("\$ne",this["_id"]))

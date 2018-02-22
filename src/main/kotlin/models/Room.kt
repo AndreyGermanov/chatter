@@ -17,10 +17,10 @@ import interactors.DBCollection
  */
 class Room(db: MongoDatabase, colName:String): DBModel(db,colName) {
 
-    override var schema = mapOf(
-            "_id" to "String",
-            "name" to "String"
-    ) as HashMap<String,String>
+    /**
+     * Link to database schema from collection
+     */
+    override var schema = app.rooms.schema
 
     /**
      * Function returns list of user sessions, which currently in this room

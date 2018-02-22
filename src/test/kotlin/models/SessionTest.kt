@@ -125,23 +125,19 @@ class SessionTest {
                 app.users.addModel(user)
                 session["loginTime"] = 12345
                 session["lastActiveTime"] = 12325
+                session["room"] = "nothing"
                 session.save {
-                    assertEquals("Should not save session if session room does not specified",0,db.getCollection("sessions").find().count())
-                    session["room"] = "nothing"
+                    assertEquals("Should not save session if session room does not exist", 0, db.getCollection("sessions").find().count())
                     session.save {
-                        assertEquals("Should not save session if session room does not exist", 0, db.getCollection("sessions").find().count())
+                        session["room"] = "r1"
                         session.save {
-                            session["room"] = "r1"
+                            assertEquals("Should save session if all data is correct", 1, db.getCollection("sessions").find().count())
+                            session["_id"] = "2342"
                             session.save {
-                                assertEquals("Should save session if all data is correct", 1, db.getCollection("sessions").find().count())
-                                session["_id"] = "2342"
-                                session.save {
-                                    assertEquals("Should not create second session for the same user", 1, db.getCollection("sessions").find().count())
-                                }
+                                assertEquals("Should not create second session for the same user", 1, db.getCollection("sessions").find().count())
                             }
                         }
                     }
-
                 }
             }
         }

@@ -23,7 +23,11 @@ import org.omg.CORBA.Object
 open class DBModel(db:MongoDatabase,colName:String) {
 
     private var doc = Document()
-    open var schema = HashMap<String,String>()
+    /**
+     * Link to database schema from collection
+     */
+    open var schema = DBCollection(db,colName).schema
+
     var collectionName:String
     var db:MongoDatabase
     var app = ChatApplication
@@ -74,7 +78,7 @@ open class DBModel(db:MongoDatabase,colName:String) {
         var col = db.getCollection(collectionName)
         var id = doc.get("_id")
         if (id==null) {
-            id = ObjectId.get()
+            id = ObjectId.get().toString()
         }
         col.updateOne(Document("_id", id), Document("\$set", doc), UpdateOptions().upsert(true))
         callback()

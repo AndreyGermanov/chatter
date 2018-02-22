@@ -218,4 +218,14 @@ class DBCollectionTest {
         }
     }
 
+    @Test
+    fun detach() {
+        addDemoData {
+            dbcol.loadList(null) {
+                dbcol.detach("new_id")
+                assertEquals("Should detach model from collection",null,dbcol.getById("new_id"))
+            }
+        }
+    }
+
 }

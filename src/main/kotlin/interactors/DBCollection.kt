@@ -33,8 +33,9 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     var db:MongoDatabase
     protected var models: ArrayList<Any> = ArrayList<Any>()
     var currentItem = 0
+    var app = ChatApplication
 
-    var schema: HashMap<String,String>? = null
+    open var schema = hashMapOf("_id" to "String") as HashMap<String,String>
 
     init {
         collectionName = colName
@@ -55,7 +56,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
         val model = DBModel(db,collectionName)
         if (schema != null) {
             model.schema = schema
-        } else if (model.schema.count()==0 && this.schema != null) {
+        } else if (this.schema != null) {
             model.schema = this.schema!!
         }
         model.addFromJSON(doc,this)
@@ -87,21 +88,21 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     open fun loadList(condition: Document?, callback:()->Unit) {
         val col = db.getCollection(collectionName)
         models.clear()
-            var result: FindIterable<Document>
-            if (condition != null) {
-                result = col.find(condition)
-            } else {
-                result = col.find()
+        var result: FindIterable<Document>
+        if (condition != null) {
+            result = col.find(condition)
+        } else {
+            result = col.find()
+        }
+        if (result.count() > 0) {
+            val docs = result.iterator()
+            for (doc in docs) {
+                addItem(doc)
             }
-            if (result.count() > 0) {
-                val docs = result.iterator()
-                for (doc in docs) {
-                    addItem(doc)
-                }
-                callback()
-            } else {
-                callback()
-            }
+            callback()
+        } else {
+            callback()
+        }
     }
 
     /**
@@ -216,6 +217,17 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
                 models.remove(model)
                 callback(true)
             }
+        }
+    }
+
+    /**
+     * Removes model from memory collection hashmap, but not from MongoDB database
+     * @param id ID of model to remove
+     */
+    fun detach(id:String) {
+        val obj = getById(id)
+        if (obj !=null) {
+            this.models.remove(obj)
         }
     }
 

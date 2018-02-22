@@ -32,6 +32,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         RESULT_ERROR_NO_LOGIN,
         RESULT_ERROR_NO_PASSWORD,
         RESULT_ERROR_NO_EMAIL,
+        RESULT_ERROR_ACTIVATION_EMAIL,
         RESULT_ERROR_UNKNOWN
     }
 
@@ -68,8 +69,24 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         RESULT_UNKNOWN
     }
 
+    /**
+     * Schema of database model
+     */
+    override var schema = hashMapOf(
+            "_id" to "String",
+            "login" to "String",
+            "password" to "String",
+            "email" to "String",
+            "default_room" to "String",
+            "active" to "Boolean",
+            "first_name" to "String",
+            "last_name" to "String",
+            "gender" to "String",
+            "birthDate" to "Int"
+    ) as HashMap<String,String>
+
     val SALT_ROUNDS = 12
-    val USER_ACTIVITY_TIMEOUT = 60
+    val USER_ACTIVITY_TIMEOUT = 10
     val USER_LOGIN_TIMEOUT = 300
 
     /**
@@ -89,8 +106,12 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
     fun register(params: JSONObject, callback:(result_code:UserRegisterResultCode,user:User?) -> Unit) {
         if (!params.contains("login")) {
             callback(UserRegisterResultCode.RESULT_ERROR_NO_LOGIN,null)
+        } else if (params.get("login").toString().isEmpty()) {
+            callback(UserRegisterResultCode.RESULT_ERROR_NO_LOGIN, null)
         } else if (!params.contains("email")) {
             callback(UserRegisterResultCode.RESULT_ERROR_NO_EMAIL,null)
+        } else if (params.get("email").toString().isEmpty()) {
+            callback(UserRegisterResultCode.RESULT_ERROR_NO_EMAIL, null)
         } else if (!params.contains("password")) {
             callback(UserRegisterResultCode.RESULT_ERROR_NO_PASSWORD,null)
         } else {
@@ -108,10 +129,14 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 user["active"] = false
                 user.save {
                     val smtpClient = SendMail(user["email"].toString(),"Chatter Account Activation")
-                    smtpClient.sendMessage("Please, follow this link to activate your Chatter account "+
+                    val result = smtpClient.sendMessage("Please, follow this link to activate your Chatter account "+
                             "http://192.168.0.184:8080/activate/"+user["_id"])
                     addModel(user)
-                    callback(UserRegisterResultCode.RESULT_OK,user)
+                    if (result) {
+                        callback(UserRegisterResultCode.RESULT_OK, user)
+                    } else {
+                        callback(UserRegisterResultCode.RESULT_ERROR_ACTIVATION_EMAIL, user)
+                    }
                 }
             }
         }
@@ -164,26 +189,26 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 } else if (!user.isActive()) {
                     callback(UserLoginResultCode.RESULT_ERROR_NOT_ACTIVATED,null)
                 } else {
-                    val session = ChatApplication.sessions.getBy("user_id",user["_id"].toString())
+                    var session = ChatApplication.sessions.getBy("user_id",user["_id"].toString())
+                    val currentTime = (System.currentTimeMillis()/1000).toInt()
                     if (session != null) {
-                        val lastActivityTime = Integer.parseInt(session["lastActiveTime"].toString())
-                        val currentTime = (System.currentTimeMillis()/1000).toInt()
+                        val lastActivityTime = Integer.parseInt(session["lastActivityTime"].toString())
                         if (currentTime-lastActivityTime<USER_ACTIVITY_TIMEOUT) {
                             callback(UserLoginResultCode.RESULT_ERROR_ALREADY_LOGIN,null)
-                        } else {
-                            val session = Session(db,collectionName,user)
-                            session["loginTime"] = currentTime
-                            session["lastActivityTime"] = currentTime
-                            if (user["default_room"] != null) {
-                                session["room"] = user["default_room"].toString()
-                            }
-                            ChatApplication.sessions.addModel(session)
-                            session.save{
-                                callback(UserLoginResultCode.RESULT_OK,user)
-                            }
-                         }
+                            return
+                        }
+                    } else {
+                        session = Session(db,"sessions",user)
                     }
-                    callback(UserLoginResultCode.RESULT_OK,user)
+                    session!!["loginTime"] = currentTime
+                    session!!["lastActivityTime"] = currentTime
+                    if (user["default_room"] != null) {
+                        session["room"] = user["default_room"].toString()
+                    }
+                    ChatApplication.sessions.addModel(session)
+                    session.save{
+                        callback(UserLoginResultCode.RESULT_OK,user)
+                    }
                 }
             }
         }
@@ -227,8 +252,30 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                         return;
                     } else if (!listOf("M","F").contains(params.get("gender").toString().trim())) {
                         callback(UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE,"gender")
+                        return
                     } else {
                         user["gender"] = params.get("gender").toString().trim()
+                    }
+                }
+
+                if (params.contains("birthDate")) {
+                    if (params.get("birthDate").toString().trim().length == 0) {
+                        callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY,"birthDate")
+                        return
+                    } else {
+                        var birthDate = 0
+                        try {
+                            birthDate = params.get("birthDate").toString().trim().toInt()
+                        } catch (e:Exception) {}
+
+                        if (birthDate==null ||
+                                birthDate==0 ||
+                                Date(birthDate.toLong()*1000).after(Date(System.currentTimeMillis()))) {
+                            callback(UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE,"birthDate")
+                            return
+                        } else {
+                            user["birthDate"] = birthDate
+                        }
                     }
                 }
                 if (params.contains("default_room")) {
@@ -243,22 +290,6 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                             return
                         } else {
                             user["default_room"] = room_id
-                        }
-                    }
-                }
-                if (params.contains("birthDate")) {
-                    if (params.get("birthDate").toString().trim().length == 0) {
-                        callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY,"birthDate")
-                        return
-                    } else {
-                        val birthDate = Integer.getInteger(params.get("birthDate").toString().trim())
-                        if (birthDate==null ||
-                                birthDate==0 ||
-                                Date(birthDate.toLong()*1000).after(Date(System.currentTimeMillis()))) {
-                            callback(UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE,"birthDate")
-                            return
-                        } else {
-                            user["birthDate"] = birthDate
                         }
                     }
                 }
