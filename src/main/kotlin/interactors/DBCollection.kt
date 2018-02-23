@@ -74,6 +74,9 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             item["_id"] == dbmodel["_id"]
         }
         if (items.count() == 0) {
+            if (model["_id"]==null) {
+                model["_id"] = ObjectId.get()
+            }
             models.add(model)
         }
     }
@@ -126,7 +129,11 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      * @return True if collection has next item or False if does not have
      */
     override fun hasNext(): Boolean {
-        return currentItem < models.count()
+        val result = currentItem < models.count()
+        if (!result) {
+            currentItem=0
+        }
+        return result
     }
 
     /**

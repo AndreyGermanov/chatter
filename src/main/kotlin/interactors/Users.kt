@@ -12,6 +12,8 @@ import org.bson.types.ObjectId
 import org.json.simple.JSONObject
 import utils.BCrypt
 import utils.SendMail
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.*
 
 /**
@@ -33,7 +35,21 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         RESULT_ERROR_NO_PASSWORD,
         RESULT_ERROR_NO_EMAIL,
         RESULT_ERROR_ACTIVATION_EMAIL,
-        RESULT_ERROR_UNKNOWN
+        RESULT_ERROR_UNKNOWN;
+        fun getMessage():String {
+            var result = ""
+            when(this) {
+                RESULT_OK -> result = "You are registered. Activation email sent. Please, open it and activate your account"
+                RESULT_ERROR_LOGIN_EXISTS -> result = "User with provided login already exists."
+                RESULT_ERROR_EMAIL_EXISTS -> result = "User with provided email already exists."
+                RESULT_ERROR_NO_LOGIN -> result = "Login is required."
+                RESULT_ERROR_NO_PASSWORD -> result = "Password is required."
+                RESULT_ERROR_NO_EMAIL -> result = "Email is required."
+                RESULT_ERROR_ACTIVATION_EMAIL -> result = "Failed to send activation email. Please contact support."
+                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support"
+            }
+            return result
+        }
     }
 
     /**
@@ -54,7 +70,18 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         RESULT_ERROR_INCORRECT_LOGIN,
         RESULT_ERROR_INCORRECT_PASSWORD,
         RESULT_ERROR_ALREADY_LOGIN,
-        RESULT_ERROR_UNKNOWN
+        RESULT_ERROR_UNKNOWN;
+        fun getMessage(): String {
+            var result = ""
+            when (this) {
+                RESULT_ERROR_NOT_ACTIVATED -> result = "Please, activate this account. Open activation email"
+                RESULT_ERROR_INCORRECT_LOGIN -> result = "Incorrect login"
+                RESULT_ERROR_INCORRECT_PASSWORD -> result = "Incorrect password"
+                RESULT_ERROR_ALREADY_LOGIN -> result = "User already in the system"
+                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support"
+            }
+            return result;
+        }
     }
 
     /**
@@ -114,6 +141,8 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             callback(UserRegisterResultCode.RESULT_ERROR_NO_EMAIL, null)
         } else if (!params.contains("password")) {
             callback(UserRegisterResultCode.RESULT_ERROR_NO_PASSWORD,null)
+        } else if (params.get("password").toString().isEmpty()) {
+            callback(UserRegisterResultCode.RESULT_ERROR_NO_PASSWORD,null)
         } else {
             val col = db.getCollection(collectionName)
             if (col.find(Document("login",params.get("login").toString())).count()>0) {
@@ -128,14 +157,16 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 user["password"] = BCrypt.hashpw(params.get("password").toString(),BCrypt.gensalt(SALT_ROUNDS))
                 user["active"] = false
                 user.save {
-                    val smtpClient = SendMail(user["email"].toString(),"Chatter Account Activation")
-                    val result = smtpClient.sendMessage("Please, follow this link to activate your Chatter account "+
-                            "http://192.168.0.184:8080/activate/"+user["_id"])
+                    app.smtpClient.init(user["email"].toString(),"Chatter Account Activation")
+                    val result = app.smtpClient.sendMessage("Please, follow this link to activate your Chatter account "+
+                            app.host+":"+app.port.toString()+"/activate/"+user["_id"])
                     addModel(user)
                     if (result) {
                         callback(UserRegisterResultCode.RESULT_OK, user)
                     } else {
-                        callback(UserRegisterResultCode.RESULT_ERROR_ACTIVATION_EMAIL, user)
+                        this.remove(user["_id"].toString()) {
+                            callback(UserRegisterResultCode.RESULT_ERROR_ACTIVATION_EMAIL, user)
+                        }
                     }
                 }
             }

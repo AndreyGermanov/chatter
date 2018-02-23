@@ -10,7 +10,7 @@ class EmailAuthenticator extends javax.mail.Authenticator
 {
     private String login   ;
     private String password;
-    public EmailAuthenticator (final String login, final String password)
+    public EmailAuthenticator (String login, String password)
     {
         this.login    = login;
         this.password = password;
@@ -24,17 +24,22 @@ class EmailAuthenticator extends javax.mail.Authenticator
 public class SendMail
 {
     private Message message        = null;
-    protected  static  String   SMTP_SERVER    = "smtp.gmail.com";
-    protected  static  String   SMTP_Port      = "465";
-    protected  static  String   SMTP_AUTH_USER = "";
-    protected  static  String   SMTP_AUTH_PWD  = "";
-    protected  static  String   EMAIL_FROM     = "chatter@it-port.ru";
-    protected  static  String   FILE_PATH      = null;
-    protected  static  String   REPLY_TO       = "chatter@it-port.ru";
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    public SendMail(final String emailTo, final String thema)
-    {
-        // ????????? SMTP SSL
+    public String   SMTP_SERVER    = "smtp.gmail.com";
+    public String   SMTP_Port      = "465";
+    public String   SMTP_AUTH_USER = "";
+    public String   SMTP_AUTH_PWD  = "";
+    public String   EMAIL_FROM     = "chatter@it-port.ru";
+    public String   FILE_PATH      = null;
+    public String   REPLY_TO       = "chatter@it-port.ru";
+    public String emailTo = "";
+    public String thema = "";
+
+    public SendMail() {
+    }
+
+    public void init(String emailTo, String thema) {
+        this.emailTo = emailTo;
+        this.thema = thema;
         Properties properties = new Properties();
         properties.put("mail.smtp.host"               , SMTP_SERVER);
         properties.put("mail.smtp.port"               , SMTP_Port  );
@@ -49,13 +54,13 @@ public class SendMail
             session.setDebug(false);
 
             InternetAddress email_from = new InternetAddress(EMAIL_FROM);
-            InternetAddress email_to   = new InternetAddress(emailTo   );
+            InternetAddress email_to   = new InternetAddress(this.emailTo   );
             InternetAddress reply_to   = (REPLY_TO != null) ?
                     new InternetAddress(REPLY_TO) : null;
             message = new MimeMessage(session);
             message.setFrom(email_from);
             message.setRecipient(Message.RecipientType.TO, email_to);
-            message.setSubject(thema);
+            message.setSubject(this.thema);
             if (reply_to != null)
                 message.setReplyTo (new Address[] {reply_to});
         } catch (AddressException e) {

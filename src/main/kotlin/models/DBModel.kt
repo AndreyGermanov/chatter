@@ -79,6 +79,7 @@ open class DBModel(db:MongoDatabase,colName:String) {
         var id = doc.get("_id")
         if (id==null) {
             id = ObjectId.get().toString()
+            doc.set("_id",id)
         }
         col.updateOne(Document("_id", id), Document("\$set", doc), UpdateOptions().upsert(true))
         callback()
