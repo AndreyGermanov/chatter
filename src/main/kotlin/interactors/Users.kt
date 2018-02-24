@@ -58,7 +58,16 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
     enum class UserActivationResultCode {
         RESULT_OK,
         RESULT_ERROR_NO_USER,
-        RESULT_ERROR_UNKNOWN
+        RESULT_ERROR_UNKNOWN;
+        fun getMessage(): String {
+            var result = ""
+            when (this) {
+                RESULT_OK -> result = "Activation successful. You can login now"
+                RESULT_ERROR_NO_USER -> result = "User account not found. Please, try to register again or contact support"
+                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please, contact support"
+            }
+            return result
+        }
     }
 
     /**
@@ -74,11 +83,11 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         fun getMessage(): String {
             var result = ""
             when (this) {
-                RESULT_ERROR_NOT_ACTIVATED -> result = "Please, activate this account. Open activation email"
-                RESULT_ERROR_INCORRECT_LOGIN -> result = "Incorrect login"
-                RESULT_ERROR_INCORRECT_PASSWORD -> result = "Incorrect password"
-                RESULT_ERROR_ALREADY_LOGIN -> result = "User already in the system"
-                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support"
+                RESULT_ERROR_NOT_ACTIVATED -> result = "Please, activate this account. Open activation email."
+                RESULT_ERROR_INCORRECT_LOGIN -> result = "Incorrect login."
+                RESULT_ERROR_INCORRECT_PASSWORD -> result = "Incorrect password."
+                RESULT_ERROR_ALREADY_LOGIN -> result = "User already in the system."
+                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support."
             }
             return result;
         }
@@ -89,11 +98,26 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
      */
     enum class UserUpdateResultCode {
         RESULT_OK,
+        RESULT_OK_PENDING_IMAGE_UPLOAD,
+        RESULT_ERROR_IMAGE_UPLOAD,
         RESULT_ERROR_USER_NOT_SPECIFIED,
         RESULT_ERROR_USER_NOT_FOUND,
         RESULT_ERROR_FIELD_IS_EMPTY,
         RESULT_ERROR_INCORRECT_FIELD_VALUE,
-        RESULT_UNKNOWN
+        RESULT_UNKNOWN;
+        fun getMessage():String {
+            var result = ""
+            when(this) {
+                RESULT_OK -> result = "Settings update successfully."
+                RESULT_OK_PENDING_IMAGE_UPLOAD -> result = "Settings update successfully."
+                RESULT_ERROR_IMAGE_UPLOAD -> result = "Error upload profile image. Please try again."
+                RESULT_ERROR_USER_NOT_SPECIFIED -> result = "User not found. Please, contact support."
+                RESULT_ERROR_FIELD_IS_EMPTY -> result = "Field is required."
+                RESULT_ERROR_INCORRECT_FIELD_VALUE -> result = "Incorrect field value."
+                RESULT_UNKNOWN -> result = "Unknown error. Please,contact support."
+            }
+            return result
+        }
     }
 
     /**
@@ -262,7 +286,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             } else {
                 var user = obj as User
                 if (params.contains("first_name")) {
-                    if (params.get("first_name").toString().trim().length == 0) {
+                    if (params.get("first_name").toString().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY, "first_name")
                         return
                     } else {
@@ -270,7 +294,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                     }
                 }
                 if (params.contains("last_name")) {
-                    if (params.get("last_name").toString().trim().length == 0) {
+                    if (params.get("last_name").toString().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY, "last_name")
                         return
                     } else {
@@ -278,7 +302,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                     }
                 }
                 if (params.contains("gender")) {
-                    if (params.get("gender").toString().trim().length == 0) {
+                    if (params.get("gender").toString().trim().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY,"gender")
                         return;
                     } else if (!listOf("M","F").contains(params.get("gender").toString().trim())) {
@@ -290,7 +314,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 }
 
                 if (params.contains("birthDate")) {
-                    if (params.get("birthDate").toString().trim().length == 0) {
+                    if (params.get("birthDate").toString().trim().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY,"birthDate")
                         return
                     } else {
@@ -310,7 +334,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                     }
                 }
                 if (params.contains("default_room")) {
-                    if (params.get("default_room").toString().trim().length == 0) {
+                    if (params.get("default_room").toString().trim().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY,"default_room")
                         return
                     } else {

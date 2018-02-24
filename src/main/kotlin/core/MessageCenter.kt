@@ -3,17 +3,21 @@ import interactors.Users
 import io.javalin.*
 import models.DBModel
 import models.Room
+import models.User
 import org.bson.Document
 import org.eclipse.jetty.websocket.api.Session
 import org.eclipse.jetty.websocket.api.WebSocketListener
+import org.eclipse.jetty.websocket.common.WebSocketSession
 import org.json.simple.JSONArray
 import org.json.simple.parser.JSONParser
 import org.json.simple.JSONObject
+import utils.toJSONString
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.*
 import java.util.zip.Adler32
 
 /**
@@ -24,13 +28,34 @@ import java.util.zip.Adler32
  * @param parent link to MessageCenter, which instatiates objects of this class to process WebSocket connections
  * @property session Link to established connection session with remote WebSocket client
  * @property msgCenter Link to owner MessageCenter
+ * @property lastResponse Last response sent to remote client
  */
-class MessageObject(parent:MessageCenter) : WebSocketListener {
+open class MessageObject(parent:MessageCenter) : WebSocketListener {
+
+    /**
+     * List of possible error codes during message exchanges on MessageServer level
+     */
+    enum class MessageObjectResponseCodes {
+        INTERNAL_ERROR,
+        AUTHENTICATION_ERROR;
+        fun getMessage():String {
+            var result = ""
+            when(this) {
+                INTERNAL_ERROR -> result = "Internal Error"
+                AUTHENTICATION_ERROR -> result = "Authentication Error"
+            }
+            return result
+        }
+    }
 
     var session: Session? = null
 
     var msgCenter = parent
     var app = ChatApplication
+    var lastResponse:String = ""
+
+
+
     /**
      * Handles chat user registration requests
      * @param params object with user registration fields
@@ -135,14 +160,67 @@ class MessageObject(parent:MessageCenter) : WebSocketListener {
      * @return JSON object with resulting status of update ("ok" or "error" and additional message about error)
      */
     public fun updateUser(params:JSONObject): JSONObject {
-        return JSONObject()
-    }
+        val result = JSONObject()
+        var status = "error"
+        var status_code = Users.UserUpdateResultCode.RESULT_OK
+        var message = ""
+        var field = ""
+        app.users.updateUser(params) { result_code,msg ->
+            status_code = result_code
+            if (status_code != Users.UserUpdateResultCode.RESULT_OK) {
+                if (status_code == Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY ||
+                        status_code == Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE) {
+                    field = msg
+                    message = status_code.getMessage()+ " " + field
+                } else {
+                    message = status_code.getMessage()
+                }
+            } else {
+                if (params.contains("profile_image_checksum") && params.get("profile_image_checksum").toString().isEmpty()) {
+                    status_code = Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY
+                    field = "profile_image_checksum"
+                    message = "Error with profile image. Please, try again"
+                } else {
+                    status = "ok"
+                    var checksum: Long = 0
+                    if (params.contains("profile_image_checksum")) {
+                        try {
+                            checksum = params.get("profile_image_checksum").toString().toLong()
+                        } catch (e: Exception) {
+                            status = "error"
+                            field = "profile_image_checksum"
+                            status_code = Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE
+                            message = "Error with profile image. Please, try again"
+                        }
+                    }
+                    if (checksum>0) {
+                        params.set("request_timestamp",System.currentTimeMillis()/1000)
+                        val pending_request = HashMap<String,Any>()
+                        if (session!=null) {
+                            pending_request.set("session", session as WebSocketSession)
+                        } else {
+                            pending_request.set("session","")
+                        }
+                        pending_request.set("request",params)
+                        this.msgCenter.file_requests.set(checksum, pending_request)
+                        status_code = Users.UserUpdateResultCode.RESULT_OK_PENDING_IMAGE_UPLOAD
+                    } else {
+                        message = status_code.getMessage()
+                    }
+                }
+            }
+        }
 
-    /**
-     * Handler of websocket errors
-     * @param cause Error exception
-     */
-    override public fun onWebSocketError(cause: Throwable) {
+        result.set("status",status)
+        result.set("status_code",status_code)
+        if (!message.isEmpty()) {
+            result.set("message", message)
+        }
+        if (!field.isEmpty()) {
+            result.set("field", field)
+        }
+
+        return result
     }
 
     /**
@@ -150,40 +228,118 @@ class MessageObject(parent:MessageCenter) : WebSocketListener {
      * @param message Received text message
      */
     override public fun onWebSocketText(message: String?) {
+
+        val system_error_response = JSONObject()
+
+        system_error_response.set("status","error")
+        system_error_response.set("status_code",MessageObjectResponseCodes.INTERNAL_ERROR)
+        system_error_response.set("message",MessageObjectResponseCodes.INTERNAL_ERROR.getMessage())
+
+        var response = JSONObject()
+
         if (message != null) {
             val parser = JSONParser()
-            val obj: JSONObject = parser.parse(message) as JSONObject
-            if (obj.containsKey("request_id")) {
-               when (obj.get("action")) {
+            var obj = JSONObject()
+            try {
+                obj = parser.parse(message) as JSONObject
+            } catch (e:Exception) {
+                response = system_error_response
+            }
+            if (obj.containsKey("request_id") && !obj.get("request_id").toString().isEmpty()) {
+                when (obj.get("action")) {
                    "register_user" -> {
                        val result = registerUser(obj)
                        if (result.contains("status")) {
-                           result.set("request_id",obj.get("request_id"))
-                           if (session!=null) {
-                               session!!.remote.sendString(result.toString())
-                           }
+                           result.set("request_id", obj.get("request_id"))
+                           response = result
                        }
                    }
                    "login_user" -> {
                        val result = loginUser(obj)
                        if (result.contains("status")) {
-                           result.set("request_id",obj.get("request_id"))
-                           if (session!=null) {
-                               session!!.remote.sendString(result.toString())
-                           }
+                           result.set("request_id", obj.get("request_id"))
+                           response = result
+                       }
+                   }
+                }
+                if (obj.containsKey("user_id") &&  app.users.getById(obj.get("user_id").toString())!=null) {
+                    if (obj.containsKey("session_id") && app.sessions.getById(obj.get("session_id").toString())!=null) {
+                        val user_session = app.sessions.getById(obj.get("session_id").toString()) as models.Session
+                        if (user_session["user_id"] == obj.get("user_id").toString()) {
+                            when (obj.get("action")) {
+                                "update_user" -> {
+                                    val result = updateUser(obj)
+                                    if (result.contains("status")) {
+                                        result.set("request_id", obj.get("request_id"))
+                                        response = result
+                                    }
+                                }
+                                else -> {
+                                    system_error_response.set("status_code",MessageObjectResponseCodes.INTERNAL_ERROR)
+                                    response = system_error_response
+                                }
+                            }
+                        } else {
+                            system_error_response.set("status_code",MessageObjectResponseCodes.AUTHENTICATION_ERROR)
+                            system_error_response.set("message",MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
+                            response = system_error_response
+                        }
+                    } else {
+                        system_error_response.set("status_code",MessageObjectResponseCodes.AUTHENTICATION_ERROR)
+                        system_error_response.set("message",MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
+                        response = system_error_response
+                    }
+               } else {
+                    system_error_response.set("status_code",MessageObjectResponseCodes.AUTHENTICATION_ERROR)
+                    system_error_response.set("message",MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
+                    response = system_error_response
+                }
+            } else {
+                response = system_error_response
+            }
+        } else {
+            response = system_error_response
+        }
+        lastResponse = toJSONString(response)
+        if (session!=null) {
+            session!!.remote.sendString(lastResponse)
+        }
+    }
 
-                       }
-                   }
-                   "update_user" -> {
-                       val result = updateUser(obj)
-                       if (result.contains("status")) {
-                           result.set("request_id",obj.get("request_id"))
-                           if (session!=null) {
-                               session!!.remote.sendString(result.toString())
-                           }
-                       }
-                   }
-               }
+
+    /** Handler which fires when server receives binary data
+     * @param payload Binary data as ByteArray
+     * @param offset Starting offset where data begins
+     * @param len Length of data in bytes
+     */
+    override public fun onWebSocketBinary(payload: ByteArray?, offset: Int, len: Int) {
+        if (payload != null) {
+            var checkSumEngine = Adler32()
+            checkSumEngine.update(payload)
+            val checksum = checkSumEngine.value
+            if (msgCenter.file_requests.containsKey(checksum)) {
+                var pending_request = msgCenter.file_requests.get(checksum) as HashMap<String,Any>
+                var request = pending_request.get("request") as JSONObject
+                var session:Session? = null
+                try {
+                    session = pending_request.get("session") as Session
+                } catch (e:Exception) {
+
+                }
+                Files.createDirectories(Paths.get("opt/chatter/users/"+request.get("user_id").toString()))
+                var fs: FileOutputStream = FileOutputStream("opt/chatter/users/"+request.get("user_id")+"/profile.png",false)
+                fs.write(payload)
+                fs.close()
+                val response = JSONObject()
+                response.set("status","ok")
+                response.set("status_code",Users.UserUpdateResultCode.RESULT_OK)
+                response.set("message",Users.UserUpdateResultCode.RESULT_OK.getMessage())
+                response.set("request_id",request.get("request_id").toString())
+                lastResponse = toJSONString(response)
+                msgCenter.file_requests.remove(checksum)
+                if (session!=null) {
+                    session!!.remote.sendString(lastResponse)
+                }
             }
         }
     }
@@ -207,31 +363,13 @@ class MessageObject(parent:MessageCenter) : WebSocketListener {
         }
     }
 
-
-    /** Handler which fires when server receives binary data
-     * @param payload Binary data as ByteArray
-     * @param offset Starting offset where data begins
-     * @param len Length of data in bytes
+    /**
+     * Handler of websocket errors
+     * @param cause Error exception
      */
-    override public fun onWebSocketBinary(payload: ByteArray?, offset: Int, len: Int) {
-        if (payload != null) {
-            var checkSumEngine = Adler32()
-            checkSumEngine.update(payload)
-            val checksum = checkSumEngine.value
-            if (msgCenter.file_requests.containsKey(checksum)) {
-                var request = msgCenter.file_requests.get(checksum) as JSONObject
-                Files.createDirectories(Paths.get("opt/chatter/users/"+request.get("user_id").toString()))
-                var fs: FileOutputStream = FileOutputStream("opt/chatter/users/"+request.get("user_id")+"/profile.png",false)
-
-                fs.write(payload)
-                fs.close()
-                if (session!=null) {
-                    session!!.remote.sendString(request.toString())
-                }
-                msgCenter.file_requests.remove(checksum)
-            }
-        }
+    override public fun onWebSocketError(cause: Throwable) {
     }
+
 }
 
 /**
@@ -239,14 +377,95 @@ class MessageObject(parent:MessageCenter) : WebSocketListener {
  *
  * @property file_requests Hashmap of requests, which is waiting for file. Key is checksum of file, value is body of
  * request, which is waiting for this file. Request is pending until file with checksum received
+ * @property app Link to main application object
+ * @property wsHandler Object delegate which used to server WebSocket client connection
+ * @property cronjobTimer Cronjob timer object, used to run requests queue cleanup
+ * @property CRONJOB_TIME_PERIOD Delay betwen cronjob runs in seconds
+ * @property PENDING_REQUEST_TIMEOUT Timeout in seconds, after which file upload requests becomes outdated and a subject
+ * to be removed by cleanup cronjob
  */
 class MessageCenter {
 
     var file_requests = HashMap<Long,Any>()
-    lateinit var wsHandler: WebSocketListener
+    val app = ChatApplication
+    var wsHandler: WebSocketListener
+    lateinit var cronjobTimer:Timer
+    var CRONJOB_TIME_PERIOD = 5
+    var PENDING_REQUEST_TIMEOUT = 10
+
+    /** Timer task class, which used to run cronjob for cleanup
+     *  pending file requests queue
+     */
+    inner class fileQueueProcessor: TimerTask() {
+        override fun run() {
+            this@MessageCenter.processFileRequestsQUeue()
+        }
+    }
+
+    /**
+     * Timer task which used to clean outdated file upload pending requests
+     */
+    fun processFileRequestsQUeue() {
+        for ((checksum,file_request) in file_requests) {
+            val pending_request = file_request as HashMap<String, Any>
+            val request = pending_request.get("request") as JSONObject
+            var session: Session? = null
+            try {
+                session = pending_request.get("session") as Session
+            } catch (e: Exception) {
+
+            }
+            val request_time = request.get("request_timestamp").toString().toInt()
+            if (System.currentTimeMillis()/1000 - request_time > PENDING_REQUEST_TIMEOUT) {
+                val response = JSONObject()
+                response.set("status","error")
+                response.set("status_code",Users.UserUpdateResultCode.RESULT_ERROR_IMAGE_UPLOAD)
+                response.set("request_id",request.get("request_id"))
+                response.set("message",Users.UserUpdateResultCode.RESULT_ERROR_IMAGE_UPLOAD.getMessage())
+                file_requests.remove(checksum)
+                if (session!=null) {
+                    session.remote.sendString(toJSONString(response))
+                }
+            }
+        }
+    }
+
+    /**
+     * Used to run cronjobs after server initialized
+     */
+    fun runCronjob() {
+        cronjobTimer = Timer()
+        cronjobTimer.schedule(fileQueueProcessor(),0,CRONJOB_TIME_PERIOD.toLong()*1000)
+    }
+
     init {
         val srv: Javalin = ChatApplication.webServer
         wsHandler = MessageObject(this)
         srv.ws("/websocket", wsHandler)
+        app.webServer.get("/activate/:token", { res ->
+            res.status(200)
+            if (res.param("token") != null && activateUser(res.param("token").toString())) {
+                res.html("<html><head></head><body>Account activated. Please, login to Chatter</body></html>")
+            } else {
+                res.html("<html><head></head><body>System error</body></html>")
+            }
+        })
+    }
+
+    /**
+     * Function used to activate user by activation email link
+     * @param token Activation token
+     * @return True if activated successfully or false otherwise
+     */
+    fun activateUser(token:String) : Boolean {
+        val userObj = app.users.getById(token)
+        if (userObj!=null) {
+            val user = userObj as User
+            user["active"] = true
+            user.save{}
+            return true
+        } else {
+            return false
+        }
     }
 }

@@ -79,6 +79,7 @@ dependencies {
 dependencies {
     compile 'com.googlecode.json-simple:json-simple:1.1.1'
     compile 'javax.mail:mail:1.4.7'
+    compile "org.mockito:mockito-core:2.+"
 }
 
 compileKotlin {
