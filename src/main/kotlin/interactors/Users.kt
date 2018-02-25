@@ -70,6 +70,17 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             }
             return result
         }
+        fun getHttpResponseCode(): Int {
+            var result = 200
+            when (this) {
+                RESULT_OK -> result = 200
+                RESULT_ERROR_NO_USER -> result = 406
+                RESULT_ERROR_USER_ALREADY_ACTIVATED -> result = 409
+                RESULT_ERROR_UNKNOWN -> result = 500
+            }
+            return result
+
+        }
     }
 
     /**
@@ -213,7 +224,10 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 callback(UserActivationResultCode.RESULT_ERROR_NO_USER)
             } else {
                 val user = obj as User
-                var active = user["active"] as Boolean
+                var active = false;
+                if (user["active"] != null) {
+                    active = user["active"] as Boolean
+                }
                 if (active) {
                     callback(UserActivationResultCode.RESULT_ERROR_USER_ALREADY_ACTIVATED)
                 } else {

@@ -452,11 +452,9 @@ class MessageCenter {
          * correct, to put this to the same module with user register and login functions
          */
         app.webServer.get("/activate/:token", { res ->
-            res.status(200)
-            var response = ""
-            app.users.activate(res.param("token").toString()) {
-                result_code -> response = result_code.getMessage()
-                res.html("<html><head></head><body>"+response+"</body></html>")
+            app.users.activate(res.param("token").toString()) { result_code ->
+                res.status(result_code.getHttpResponseCode())
+                res.html("<html><head></head><body>"+result_code.getMessage()+"</body></html>")
             }
         })
     }

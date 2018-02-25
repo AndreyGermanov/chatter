@@ -68,6 +68,7 @@
     <orderEntry type="library" name="Gradle: com.googlecode.json-simple:json-simple:1.1.1" level="project" />
     <orderEntry type="library" name="Gradle: javax.mail:mail:1.4.7" level="project" />
     <orderEntry type="library" name="Gradle: org.mockito:mockito-core:2.15.0" level="project" />
+    <orderEntry type="library" name="Gradle: khttp:khttp:0.1.0" level="project" />
     <orderEntry type="library" name="Gradle: junit:junit:4.11" level="project" />
     <orderEntry type="library" name="Gradle: org.jetbrains.kotlin:kotlin-stdlib-jre8:1.2.21" level="project" />
     <orderEntry type="library" name="Gradle: org.slf4j:slf4j-api:1.7.25" level="project" />
@@ -80,6 +81,7 @@
     <orderEntry type="library" name="Gradle: net.bytebuddy:byte-buddy:1.7.9" level="project" />
     <orderEntry type="library" name="Gradle: net.bytebuddy:byte-buddy-agent:1.7.9" level="project" />
     <orderEntry type="library" name="Gradle: org.objenesis:objenesis:2.6" level="project" />
+    <orderEntry type="library" name="Gradle: org.json:json:20150729" level="project" />
     <orderEntry type="library" name="Gradle: org.jetbrains.kotlin:kotlin-stdlib-jre7:1.2.21" level="project" />
     <orderEntry type="library" name="Gradle: javax.servlet:javax.servlet-api:3.1.0" level="project" />
     <orderEntry type="library" name="Gradle: org.eclipse.jetty:jetty-http:9.4.8.v20171121" level="project" />
