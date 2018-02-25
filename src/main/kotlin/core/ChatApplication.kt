@@ -56,6 +56,10 @@ object ChatApplication {
 
     var smtpClient = SendMail()
 
+    /**
+     * Application starter. Function starts Web server, WebSocket message center, Database server and lads
+     * main collections from database
+     */
     fun run() {
 
         this.dBServer = DB()

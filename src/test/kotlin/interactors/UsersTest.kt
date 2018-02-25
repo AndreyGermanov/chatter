@@ -112,6 +112,9 @@ class UsersTest {
                         assertEquals("Should not activate user with incorrect token",Users.UserActivationResultCode.RESULT_ERROR_NO_USER,result)
                         app.users.activate(activation_code) { result ->
                             assertEquals("Should activate registered user with correct token",Users.UserActivationResultCode.RESULT_OK,result)
+                            app.users.activate(activation_code) { result ->
+                                assertEquals("Should not activate registered user twice",Users.UserActivationResultCode.RESULT_ERROR_USER_ALREADY_ACTIVATED,result)
+                            }
                         }
                     }
                 } else {

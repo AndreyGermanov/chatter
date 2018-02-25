@@ -398,14 +398,15 @@ class MessageCenter {
      */
     inner class fileQueueProcessor: TimerTask() {
         override fun run() {
-            this@MessageCenter.processFileRequestsQUeue()
+            this@MessageCenter.processFileRequestsQueue()
         }
     }
 
     /**
      * Timer task which used to clean outdated file upload pending requests
      */
-    fun processFileRequestsQUeue() {
+    fun processFileRequestsQueue() {
+        var toRemove = ArrayList<Long>()
         for ((checksum,file_request) in file_requests) {
             val pending_request = file_request as HashMap<String, Any>
             val request = pending_request.get("request") as JSONObject
@@ -422,11 +423,14 @@ class MessageCenter {
                 response.set("status_code",Users.UserUpdateResultCode.RESULT_ERROR_IMAGE_UPLOAD)
                 response.set("request_id",request.get("request_id"))
                 response.set("message",Users.UserUpdateResultCode.RESULT_ERROR_IMAGE_UPLOAD.getMessage())
-                file_requests.remove(checksum)
+                toRemove.add(checksum)
                 if (session!=null) {
                     session.remote.sendString(toJSONString(response))
                 }
             }
+        }
+        for (item_index in toRemove) {
+            file_requests.remove(item_index)
         }
     }
 
@@ -442,30 +446,19 @@ class MessageCenter {
         val srv: Javalin = ChatApplication.webServer
         wsHandler = MessageObject(this)
         srv.ws("/websocket", wsHandler)
+
+        /**
+         * HTTP endpoint to activate user account by link. (It's not websocket, but logically
+         * correct, to put this to the same module with user register and login functions
+         */
         app.webServer.get("/activate/:token", { res ->
             res.status(200)
-            if (res.param("token") != null && activateUser(res.param("token").toString())) {
-                res.html("<html><head></head><body>Account activated. Please, login to Chatter</body></html>")
-            } else {
-                res.html("<html><head></head><body>System error</body></html>")
+            var response = ""
+            app.users.activate(res.param("token").toString()) {
+                result_code -> response = result_code.getMessage()
+                res.html("<html><head></head><body>"+response+"</body></html>")
             }
         })
     }
 
-    /**
-     * Function used to activate user by activation email link
-     * @param token Activation token
-     * @return True if activated successfully or false otherwise
-     */
-    fun activateUser(token:String) : Boolean {
-        val userObj = app.users.getById(token)
-        if (userObj!=null) {
-            val user = userObj as User
-            user["active"] = true
-            user.save{}
-            return true
-        } else {
-            return false
-        }
-    }
 }

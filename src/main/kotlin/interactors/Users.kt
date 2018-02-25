@@ -58,13 +58,15 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
     enum class UserActivationResultCode {
         RESULT_OK,
         RESULT_ERROR_NO_USER,
+        RESULT_ERROR_USER_ALREADY_ACTIVATED,
         RESULT_ERROR_UNKNOWN;
         fun getMessage(): String {
             var result = ""
             when (this) {
-                RESULT_OK -> result = "Activation successful. You can login now"
-                RESULT_ERROR_NO_USER -> result = "User account not found. Please, try to register again or contact support"
-                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please, contact support"
+                RESULT_OK -> result = "Activation successful. You can login now."
+                RESULT_ERROR_NO_USER -> result = "User account not found. Please, try to register again or contact support."
+                RESULT_ERROR_USER_ALREADY_ACTIVATED -> result = "User account already activated. You can login now."
+                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please, contact support."
             }
             return result
         }
@@ -211,9 +213,14 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 callback(UserActivationResultCode.RESULT_ERROR_NO_USER)
             } else {
                 val user = obj as User
-                user["active"] = true
-                user.save {
-                    callback(UserActivationResultCode.RESULT_OK)
+                var active = user["active"] as Boolean
+                if (active) {
+                    callback(UserActivationResultCode.RESULT_ERROR_USER_ALREADY_ACTIVATED)
+                } else {
+                    user["active"] = true
+                    user.save {
+                        callback(UserActivationResultCode.RESULT_OK)
+                    }
                 }
             }
         }
