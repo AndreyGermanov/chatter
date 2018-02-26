@@ -249,7 +249,6 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
      * @return callback with result of operation and link to user model, if exist
      */
     fun login(login:String,password:String,callback:(result_code:UserLoginResultCode,user:User?)->Unit) {
-
         if(login.length==0) {
             callback(UserLoginResultCode.RESULT_ERROR_INCORRECT_LOGIN,null)
         } else if (password.length==0) {
@@ -278,7 +277,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                     }
                     session!!["loginTime"] = currentTime
                     session!!["lastActivityTime"] = currentTime
-                    if (user["default_room"] != null) {
+                    if (user["default_room"] != null && app.rooms.getById(user["default_room"].toString())!=null) {
                         session["room"] = user["default_room"].toString()
                     }
                     ChatApplication.sessions.addModel(session)

@@ -228,9 +228,7 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
      * @param message Received text message
      */
     override public fun onWebSocketText(message: String?) {
-
         val system_error_response = JSONObject()
-
         system_error_response.set("status","error")
         system_error_response.set("status_code",MessageObjectResponseCodes.INTERNAL_ERROR)
         system_error_response.set("message",MessageObjectResponseCodes.INTERNAL_ERROR.getMessage())
@@ -247,52 +245,54 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
             }
             if (obj.containsKey("request_id") && !obj.get("request_id").toString().isEmpty()) {
                 when (obj.get("action")) {
-                   "register_user" -> {
-                       val result = registerUser(obj)
-                       if (result.contains("status")) {
-                           result.set("request_id", obj.get("request_id"))
-                           response = result
-                       }
-                   }
-                   "login_user" -> {
-                       val result = loginUser(obj)
-                       if (result.contains("status")) {
-                           result.set("request_id", obj.get("request_id"))
-                           response = result
-                       }
-                   }
-                }
-                if (obj.containsKey("user_id") &&  app.users.getById(obj.get("user_id").toString())!=null) {
-                    if (obj.containsKey("session_id") && app.sessions.getById(obj.get("session_id").toString())!=null) {
-                        val user_session = app.sessions.getById(obj.get("session_id").toString()) as models.Session
-                        if (user_session["user_id"] == obj.get("user_id").toString()) {
-                            when (obj.get("action")) {
-                                "update_user" -> {
-                                    val result = updateUser(obj)
-                                    if (result.contains("status")) {
-                                        result.set("request_id", obj.get("request_id"))
-                                        response = result
+                    "register_user" -> {
+                        val result = registerUser(obj)
+                        if (result.contains("status")) {
+                            result.set("request_id", obj.get("request_id"))
+                            response = result
+                        }
+                    }
+                    "login_user" -> {
+                        val result = loginUser(obj)
+                        if (result.contains("status")) {
+                            result.set("request_id", obj.get("request_id"))
+                            response = result
+                        }
+                    }
+                    else -> {
+                        if (obj.containsKey("user_id") && app.users.getById(obj.get("user_id").toString()) != null) {
+                            if (obj.containsKey("session_id") && app.sessions.getById(obj.get("session_id").toString()) != null) {
+                                val user_session = app.sessions.getById(obj.get("session_id").toString()) as models.Session
+                                if (user_session["user_id"] == obj.get("user_id").toString()) {
+                                    when (obj.get("action")) {
+                                        "update_user" -> {
+                                            val result = updateUser(obj)
+                                            if (result.contains("status")) {
+                                                result.set("request_id", obj.get("request_id"))
+                                                response = result
+                                            }
+                                        }
+                                        else -> {
+                                            system_error_response.set("status_code", MessageObjectResponseCodes.INTERNAL_ERROR)
+                                            response = system_error_response
+                                        }
                                     }
-                                }
-                                else -> {
-                                    system_error_response.set("status_code",MessageObjectResponseCodes.INTERNAL_ERROR)
+                                } else {
+                                    system_error_response.set("status_code", MessageObjectResponseCodes.AUTHENTICATION_ERROR)
+                                    system_error_response.set("message", MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
                                     response = system_error_response
                                 }
+                            } else {
+                                system_error_response.set("status_code", MessageObjectResponseCodes.AUTHENTICATION_ERROR)
+                                system_error_response.set("message", MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
+                                response = system_error_response
                             }
                         } else {
-                            system_error_response.set("status_code",MessageObjectResponseCodes.AUTHENTICATION_ERROR)
-                            system_error_response.set("message",MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
+                            system_error_response.set("status_code", MessageObjectResponseCodes.AUTHENTICATION_ERROR)
+                            system_error_response.set("message", MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
                             response = system_error_response
                         }
-                    } else {
-                        system_error_response.set("status_code",MessageObjectResponseCodes.AUTHENTICATION_ERROR)
-                        system_error_response.set("message",MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
-                        response = system_error_response
                     }
-               } else {
-                    system_error_response.set("status_code",MessageObjectResponseCodes.AUTHENTICATION_ERROR)
-                    system_error_response.set("message",MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
-                    response = system_error_response
                 }
             } else {
                 response = system_error_response

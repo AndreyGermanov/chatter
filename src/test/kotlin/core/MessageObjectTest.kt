@@ -34,8 +34,6 @@ class MessageObjectTest {
     val app = ChatApplication
     lateinit var wsHandler: MessageObject
     lateinit var db: MongoDatabase
-    var webSocketResponse = ""
-    lateinit var webSocketSession: org.eclipse.jetty.websocket.api.Session
     val parser = JSONParser()
 
     @Before

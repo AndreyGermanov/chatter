@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit
 class SimpleEchoSocket() {
     private val closeLatch: CountDownLatch
     private var session: Session? = null
-    lateinit var delegate:MessageObjectTest
+    lateinit var delegate:MessageCenterTest
+    var lastResponse = ""
 
     init {
         this.closeLatch = CountDownLatch(1)
@@ -31,34 +32,18 @@ class SimpleEchoSocket() {
 
     @OnWebSocketClose
     fun onClose(statusCode: Int, reason: String) {
-        System.out.printf("Connection closed: %d - %s%n", statusCode, reason)
         this.session = null
         this.closeLatch.countDown() // trigger latch
     }
 
     @OnWebSocketConnect
     fun onConnect(session: Session) {
-        System.out.printf("Got connect: %s%n", session)
-        delegate.webSocketSession = session
         this.session = session
-        try {
-            var fut: Future<Void>
-            fut = session.getRemote().sendStringByFuture("Hello")
-            fut.get(2, TimeUnit.SECONDS) // wait for send to complete.
-
-            fut = session.getRemote().sendStringByFuture("Thanks for the conversation.")
-            fut.get(2, TimeUnit.SECONDS) // wait for send to complete.
-
-            session.close(StatusCode.NORMAL, "I'm done")
-        } catch (t: Throwable) {
-            t.printStackTrace()
-        }
-
     }
 
     @OnWebSocketMessage
     fun onMessage(msg: String) {
+        lastResponse = msg
         delegate.webSocketResponse = msg
-        System.out.printf("Got msg: %s%n", msg)
     }
 }

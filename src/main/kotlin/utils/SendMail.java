@@ -81,7 +81,7 @@ public class SendMail
         return mbp;
     }
 
-    public boolean sendMessage (final String text)
+    public boolean sendMessage (final String text) throws Exception
     {
         boolean result = false;
         try {
@@ -96,7 +96,7 @@ public class SendMail
             message.setContent(mmp);
             Transport.send(message);
             result = true;
-        } catch (MessagingException e){
+        } catch (Exception e){
             System.err.println(e.getMessage());
         }
         return result;
