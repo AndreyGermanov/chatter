@@ -1,12 +1,17 @@
 package core
 import interactors.Users
 import io.javalin.*
+import io.javalin.embeddedserver.jetty.websocket.WebSocketConfig
+import io.javalin.embeddedserver.jetty.websocket.WebSocketHandler
 import models.DBModel
 import models.Room
 import models.User
 import org.bson.Document
 import org.eclipse.jetty.websocket.api.Session
+import org.eclipse.jetty.websocket.api.WebSocketAdapter
 import org.eclipse.jetty.websocket.api.WebSocketListener
+import org.eclipse.jetty.websocket.api.WebSocketPolicy
+import org.eclipse.jetty.websocket.api.annotations.WebSocket
 import org.eclipse.jetty.websocket.common.WebSocketSession
 import org.json.simple.JSONArray
 import org.json.simple.parser.JSONParser
@@ -30,7 +35,8 @@ import java.util.zip.Adler32
  * @property msgCenter Link to owner MessageCenter
  * @property lastResponse Last response sent to remote client
  */
-open class MessageObject(parent:MessageCenter) : WebSocketListener {
+@WebSocket(maxTextMessageSize = 1048576, maxBinaryMessageSize = 1048576*1000)
+open class MessageObject(parent:MessageCenter) : WebSocketAdapter() {
 
     /**
      * List of possible error codes during message exchanges on MessageServer level
@@ -48,12 +54,11 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
         }
     }
 
-    var session: Session? = null
+    var remoteSession: Session? = null
 
     var msgCenter = parent
     var app = ChatApplication
     var lastResponse:String = ""
-
 
 
     /**
@@ -142,8 +147,8 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
                         val checksumEngine = Adler32()
                         checksumEngine.update(img)
                         response.set("checksum",checksumEngine.value.toString())
-                        if (session!=null) {
-                            session!!.remote.sendBytes(ByteBuffer.wrap(img))
+                        if (remoteSession!=null) {
+                            remoteSession!!.remote.sendBytes(ByteBuffer.wrap(img))
                         }
                     }
                 }
@@ -197,8 +202,8 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
                     if (checksum>0) {
                         params.set("request_timestamp",System.currentTimeMillis()/1000)
                         val pending_request = HashMap<String,Any>()
-                        if (session!=null) {
-                            pending_request.set("session", session as WebSocketSession)
+                        if (remoteSession!=null) {
+                            pending_request.set("session", remoteSession as WebSocketSession)
                         } else {
                             pending_request.set("session","")
                         }
@@ -274,6 +279,7 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
                                         "update_user" -> {
                                             val result = updateUser(obj)
                                             if (result.contains("status")) {
+                                                result.set("action",obj.get("action"))
                                                 result.set("request_id", obj.get("request_id"))
                                                 response = result
                                             }
@@ -307,8 +313,8 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
             response = system_error_response
         }
         lastResponse = toJSONString(response)
-        if (session!=null) {
-            session!!.remote.sendString(lastResponse)
+        if (remoteSession!=null) {
+            remoteSession!!.remote.sendString(lastResponse)
         }
     }
 
@@ -355,8 +361,11 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
      * @param session Link to session object
      */
     override public fun onWebSocketConnect(session: Session?) {
+        (if (session != null) {
+            session.policy.maxBinaryMessageSize = 99999999
+        })
         if (session != null) {
-            this.session = session
+            this.remoteSession = session
         }
     }
 
@@ -374,6 +383,7 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
      * @param cause Error exception
      */
     override public fun onWebSocketError(cause: Throwable) {
+        println("ERROR "+cause.message)
     }
 
 }
@@ -451,7 +461,9 @@ class MessageCenter {
     init {
         val srv: Javalin = ChatApplication.webServer
         wsHandler = MessageObject(this)
-        srv.ws("/websocket", wsHandler)
+        var pol = WebSocketPolicy.newServerPolicy()
+        pol.maxBinaryMessageSize = 99999999
+        srv.ws("/websocket",wsHandler)
 
         /**
          * HTTP endpoint to activate user account by link. (It's not websocket, but logically
