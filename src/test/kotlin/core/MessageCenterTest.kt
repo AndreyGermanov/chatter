@@ -245,6 +245,7 @@ class MessageCenterTest {
             assertEquals("Should return correct user_id",response.get("user_id").toString(),user["_id"].toString())
             assertEquals("Should return correct session_id",response.get("session_id").toString(),sess["_id"].toString())
             assertEquals("Should return correct login",response.get("login").toString(),user["login"].toString())
+            assertEquals("Should return correct email",response.get("email").toString(),user["email"].toString())
             assertEquals("Should return correct first_name",response.get("first_name").toString(),user["first_name"].toString())
             assertEquals("Should return correct last_name",response.get("last_name").toString(),user["last_name"].toString())
             assertEquals("Should return correct gender",response.get("gender").toString(),user["gender"].toString())

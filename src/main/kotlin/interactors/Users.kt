@@ -117,6 +117,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         RESULT_ERROR_USER_NOT_FOUND,
         RESULT_ERROR_FIELD_IS_EMPTY,
         RESULT_ERROR_INCORRECT_FIELD_VALUE,
+        RESULT_ERROR_PASSWORDS_SHOULD_MATCH,
         RESULT_UNKNOWN;
         fun getMessage():String {
             var result = ""
@@ -127,6 +128,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 RESULT_ERROR_USER_NOT_SPECIFIED -> result = "User not found. Please, contact support."
                 RESULT_ERROR_FIELD_IS_EMPTY -> result = "Field is required."
                 RESULT_ERROR_INCORRECT_FIELD_VALUE -> result = "Incorrect field value."
+                RESULT_ERROR_PASSWORDS_SHOULD_MATCH -> result = "Passwords should match."
                 RESULT_UNKNOWN -> result = "Unknown error. Please,contact support."
             }
             return result
@@ -305,6 +307,19 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 callback(UserUpdateResultCode.RESULT_ERROR_USER_NOT_FOUND,"")
             } else {
                 var user = obj as User
+                if (params.contains("password")) {
+                    if (params.get("password").toString().isEmpty()) {
+                        callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY, "password")
+                        return
+                    } else {
+                        if (!params.contains("confirm_password") || params.get("confirm_password")!=params.get("password")) {
+                            callback(UserUpdateResultCode.RESULT_ERROR_PASSWORDS_SHOULD_MATCH, "password")
+                            return
+                        } else {
+                            user["password"] = BCrypt.hashpw(params.get("password").toString(),BCrypt.gensalt(SALT_ROUNDS))
+                        }
+                    }
+                }
                 if (params.contains("first_name")) {
                     if (params.get("first_name").toString().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY, "first_name")

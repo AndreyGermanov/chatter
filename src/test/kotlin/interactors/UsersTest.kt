@@ -195,64 +195,74 @@ class UsersTest {
                     obj.remove("first_name")
                     app.users.updateUser(obj) { result,message ->
                         assertEquals("Should success if some fields not provided",Users.UserUpdateResultCode.RESULT_OK,result)
-                        obj.set("first_name","")
-                        app.users.updateUser(obj) { result,message ->
-                            assertTrue("Should contain correct first_name",result==Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message=="first_name")
-                            obj.set("first_name","Bob")
-                            obj.set("last_name","")
-                            app.users.updateUser(obj) { result,message ->
-                                assertTrue("Should contain correct last_name",result==Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message=="last_name")
-                                obj.set("last_name","Brown")
-                                obj.set("gender","")
-                                app.users.updateUser(obj) { result,message ->
-                                    assertTrue("Should contain correct gender",result==Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message=="gender")
-                                    obj.set("gender","widget")
-                                    app.users.updateUser(obj) { result,message ->
-                                        assertTrue("Should contain correct gender",result==Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message=="gender")
-                                        obj.set("gender","M")
-                                        obj.set("birthDate","")
+                        obj.set("password","")
+                        app.users.updateUser(obj) { result, message ->
+                            assertTrue("Should contain correct password", result == Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message == "password")
+                            obj.set("password","12345")
+                            obj.set("confirm_password","1234")
+                            app.users.updateUser(obj) { result, message ->
+                                assertTrue("Password and confirm password should match", result == Users.UserUpdateResultCode.RESULT_ERROR_PASSWORDS_SHOULD_MATCH && message == "password")
+                                obj.set("confirm_password","12345")
+                                obj.set("first_name", "")
+                                app.users.updateUser(obj) { result, message ->
+                                    assertTrue("Should contain correct first_name", result == Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message == "first_name")
+                                    obj.set("first_name", "Bob")
+                                    obj.set("last_name", "")
+                                    app.users.updateUser(obj) { result, message ->
+                                        assertTrue("Should contain correct last_name", result == Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message == "last_name")
+                                        obj.set("last_name", "Brown")
+                                        obj.set("gender", "")
                                         app.users.updateUser(obj) { result, message ->
-                                            assertTrue("Should contain correct birthDate",result==Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message=="birthDate")
-                                            obj.set("birthDate","too old to remember")
+                                            assertTrue("Should contain correct gender", result == Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message == "gender")
+                                            obj.set("gender", "widget")
                                             app.users.updateUser(obj) { result, message ->
-                                                assertTrue("Should contain correct birthDate",result==Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message=="birthDate")
-                                                obj.set("birthDate",0)
-                                                app.users.updateUser(obj) { result,message ->
-                                                    assertTrue("Should contain correct birthDate",result==Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message=="birthDate")
-                                                    obj.set("birthDate",9999999999*100)
+                                                assertTrue("Should contain correct gender", result == Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message == "gender")
+                                                obj.set("gender", "M")
+                                                obj.set("birthDate", "")
+                                                app.users.updateUser(obj) { result, message ->
+                                                    assertTrue("Should contain correct birthDate", result == Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message == "birthDate")
+                                                    obj.set("birthDate", "too old to remember")
                                                     app.users.updateUser(obj) { result, message ->
-                                                        assertTrue("Should contain correct birthDate",result==Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message=="birthDate")
-                                                        var calendar = Calendar.getInstance()
-                                                        calendar.set(1981,9,18)
-                                                        obj.set("birthDate",(calendar.timeInMillis/1000).toInt())
-                                                        obj.set("default_room","")
+                                                        assertTrue("Should contain correct birthDate", result == Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message == "birthDate")
+                                                        obj.set("birthDate", 0)
                                                         app.users.updateUser(obj) { result, message ->
-                                                            assertTrue("Should contain correct default room",result==Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message=="default_room")
-                                                            obj.set("default_room","NO ROOM totally")
-                                                            app.users.updateUser(obj) { result,message ->
-                                                                assertTrue("Should contain correct default room",result==Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message=="default_room")
-                                                                val room = app.rooms.getBy("name","Room 1")
-                                                                val room_id = room!!["_id"]
-                                                                obj.set("default_room",room_id)
-                                                                app.users.updateUser(obj) { result,message ->
-                                                                    assertEquals("Should accept update if parameters are ok",Users.UserUpdateResultCode.RESULT_OK,result)
-                                                                    val obj = col.find(Document("login","login1")).first()
-                                                                    val db_first_name = obj.get("first_name").toString()
-                                                                    val db_last_name = obj.get("last_name").toString()
-                                                                    val db_gender = obj.get("gender").toString()
-                                                                    val db_birthDate = obj.get("birthDate").toString().toInt()
-                                                                    var db_default_room = obj.get("default_room").toString()
-                                                                    val usr = app.users.getBy("login","login1") as User
-                                                                    val col_first_name = usr.get("first_name").toString()
-                                                                    val col_last_name = usr.get("last_name").toString()
-                                                                    val col_gender = usr.get("gender").toString()
-                                                                    val col_birthDate = usr.get("birthDate").toString().toInt()
-                                                                    var col_default_room = usr.get("default_room").toString()
-                                                                    assertTrue("Should have correct first_name",db_first_name == col_first_name && col_first_name == "Bob")
-                                                                    assertTrue("Should have correct last_name",db_last_name == col_last_name && col_last_name == "Brown")
-                                                                    assertTrue("Should have correct gender",db_gender == col_gender && col_gender == "M")
-                                                                    assertTrue("Should have correct birthDate",db_birthDate == col_birthDate && col_birthDate == (calendar.timeInMillis/1000).toInt())
-                                                                    assertTrue("Should have correct default_room",db_default_room == col_default_room && col_default_room == room_id)
+                                                            assertTrue("Should contain correct birthDate", result == Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message == "birthDate")
+                                                            obj.set("birthDate", 9999999999 * 100)
+                                                            app.users.updateUser(obj) { result, message ->
+                                                                assertTrue("Should contain correct birthDate", result == Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message == "birthDate")
+                                                                var calendar = Calendar.getInstance()
+                                                                calendar.set(1981, 9, 18)
+                                                                obj.set("birthDate", (calendar.timeInMillis / 1000).toInt())
+                                                                obj.set("default_room", "")
+                                                                app.users.updateUser(obj) { result, message ->
+                                                                    assertTrue("Should contain correct default room", result == Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY && message == "default_room")
+                                                                    obj.set("default_room", "NO ROOM totally")
+                                                                    app.users.updateUser(obj) { result, message ->
+                                                                        assertTrue("Should contain correct default room", result == Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE && message == "default_room")
+                                                                        val room = app.rooms.getBy("name", "Room 1")
+                                                                        val room_id = room!!["_id"]
+                                                                        obj.set("default_room", room_id)
+                                                                        app.users.updateUser(obj) { result, message ->
+                                                                            assertEquals("Should accept update if parameters are ok", Users.UserUpdateResultCode.RESULT_OK, result)
+                                                                            val obj = col.find(Document("login", "login1")).first()
+                                                                            val db_first_name = obj.get("first_name").toString()
+                                                                            val db_last_name = obj.get("last_name").toString()
+                                                                            val db_gender = obj.get("gender").toString()
+                                                                            val db_birthDate = obj.get("birthDate").toString().toInt()
+                                                                            var db_default_room = obj.get("default_room").toString()
+                                                                            val usr = app.users.getBy("login", "login1") as User
+                                                                            val col_first_name = usr.get("first_name").toString()
+                                                                            val col_last_name = usr.get("last_name").toString()
+                                                                            val col_gender = usr.get("gender").toString()
+                                                                            val col_birthDate = usr.get("birthDate").toString().toInt()
+                                                                            var col_default_room = usr.get("default_room").toString()
+                                                                            assertTrue("Should have correct first_name", db_first_name == col_first_name && col_first_name == "Bob")
+                                                                            assertTrue("Should have correct last_name", db_last_name == col_last_name && col_last_name == "Brown")
+                                                                            assertTrue("Should have correct gender", db_gender == col_gender && col_gender == "M")
+                                                                            assertTrue("Should have correct birthDate", db_birthDate == col_birthDate && col_birthDate == (calendar.timeInMillis / 1000).toInt())
+                                                                            assertTrue("Should have correct default_room", db_default_room == col_default_room && col_default_room == room_id)
+                                                                        }
+                                                                    }
                                                                 }
                                                             }
                                                         }

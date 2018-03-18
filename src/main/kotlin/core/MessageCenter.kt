@@ -107,6 +107,7 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
                         response.set("session_id",session["_id"])
                     }
                     response.set("login",user!!["login"])
+                    response.set("email",user!!["email"])
                     response.set("user_id",user!!["_id"])
                     if (user!!["first_name"]!=null) {
                         response.set("first_name",user["first_name"].toString())
@@ -210,7 +211,6 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
                 }
             }
         }
-
         result.set("status",status)
         result.set("status_code",status_code)
         if (!message.isEmpty()) {
@@ -244,6 +244,12 @@ open class MessageObject(parent:MessageCenter) : WebSocketListener {
                 response = system_error_response
             }
             if (obj.containsKey("request_id") && !obj.get("request_id").toString().isEmpty()) {
+                response["request_id"] = obj["request_id"].toString()
+                system_error_response["request_id"] = obj["request_id"].toString()
+                if (obj.containsKey("action")) {
+                    response["action"] = obj["action"].toString()
+                    system_error_response["action"] = obj["action"].toString()
+                }
                 when (obj.get("action")) {
                     "register_user" -> {
                         val result = registerUser(obj)
