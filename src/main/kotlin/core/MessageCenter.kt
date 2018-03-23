@@ -60,7 +60,6 @@ open class MessageObject(parent:MessageCenter) : WebSocketAdapter() {
     var app = ChatApplication
     var lastResponse:String = ""
 
-
     /**
      * Handles chat user registration requests
      * @param params object with user registration fields

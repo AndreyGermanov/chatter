@@ -4,20 +4,15 @@ import com.mongodb.client.MongoDatabase
 import core.ChatApplication
 import core.DB
 import interactors.Users
-import javafx.scene.shape.Path
 import org.bson.Document
 import org.bson.types.ObjectId
 import org.junit.After
 import org.junit.Test
-
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
-import org.junit.internal.runners.statements.ExpectException
 import org.junit.rules.ExpectedException
 import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.zip.CRC32
@@ -83,7 +78,7 @@ class UserTest {
             assertEquals("Check path of user profile image, if it does not exist",null,path)
             val stream = FileInputStream("src/test/resources/profile.png")
             val data = stream.readBytes()
-            val checksumEngine = Adler32()
+            val checksumEngine = CRC32()
             checksumEngine.update(data)
             val origChecksum = checksumEngine.value
             user.setProfileImage(data) {
@@ -103,7 +98,7 @@ class UserTest {
         val user = getMockUser()
         val stream = FileInputStream("src/test/resources/profile.png")
         val data = stream.readBytes()
-        val checksumEngine = Adler32()
+        val checksumEngine = CRC32()
         checksumEngine.update(data)
         val origChecksum = checksumEngine.value
         user.setProfileImage(data) { checksum ->
