@@ -20,7 +20,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Paths
-import java.util.zip.Adler32
+import java.util.zip.CRC32
 
 /**
  * Created by andrey on 2/21/18.
@@ -134,7 +134,7 @@ class UserTest {
             val data = stream.readBytes()
             user.setProfileImage(data) { checksum ->
                 user.getProfileImage { data ->
-                    val checksumEngine = Adler32()
+                    val checksumEngine = CRC32()
                     checksumEngine.update(data)
                     assertEquals("Check existing profile image",checksum,checksumEngine.value)
                     val origPath = app.usersPath

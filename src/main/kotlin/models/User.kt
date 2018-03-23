@@ -8,7 +8,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Paths
-import java.util.zip.Adler32
+import java.util.zip.CRC32
 
 /**
  * Model, which represents user in chat
@@ -52,7 +52,7 @@ class User(db:MongoDatabase,colName:String) : DBModel(db,colName) {
             var fs: FileOutputStream = FileOutputStream(app.usersPath + "/" + this["_id"].toString() + "/profile.png", false)
             fs.write(data)
             fs.close()
-            val checksumEngine = Adler32()
+            val checksumEngine = CRC32()
             checksumEngine.update(data)
             callback(checksumEngine.value)
         } else {

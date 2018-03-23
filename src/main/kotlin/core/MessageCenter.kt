@@ -23,7 +23,7 @@ import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
-import java.util.zip.Adler32
+import java.util.zip.CRC32
 
 /**
  * WebSocket server handler class. Provides set of event handlers for all events
@@ -31,7 +31,7 @@ import java.util.zip.Adler32
  * from chat clients
  *
  * @param parent link to MessageCenter, which instatiates objects of this class to process WebSocket connections
- * @property session Link to established connection session with remote WebSocket client
+ * @property remoteSession Link to established connection session with remote WebSocket client
  * @property msgCenter Link to owner MessageCenter
  * @property lastResponse Last response sent to remote client
  */
@@ -144,12 +144,11 @@ open class MessageObject(parent:MessageCenter) : WebSocketAdapter() {
                     if (Files.exists(Paths.get(app.usersPath+"/"+user["_id"]+"/profile.png"))) {
                         val stream = FileInputStream(app.usersPath+"/"+user["_id"]+"/profile.png")
                         val img = stream.readBytes()
-                        val checksumEngine = Adler32()
+                        val checksumEngine = CRC32()
                         checksumEngine.update(img)
                         response.set("checksum",checksumEngine.value.toString())
-                        if (remoteSession!=null) {
-                            remoteSession!!.remote.sendBytes(ByteBuffer.wrap(img))
-                        }
+                        response.set("file",img)
+
                     }
                 }
             }
@@ -312,9 +311,20 @@ open class MessageObject(parent:MessageCenter) : WebSocketAdapter() {
         } else {
             response = system_error_response
         }
+        var file:ByteArray? = null
+        if (response.contains("file") && response.get("file") is ByteArray) {
+            file = response.get("file") as ByteArray
+            response.remove("file")
+
+        }
         lastResponse = toJSONString(response)
         if (remoteSession!=null) {
             remoteSession!!.remote.sendString(lastResponse)
+        }
+        if (file != null) {
+            if (remoteSession!=null) {
+                remoteSession!!.remote.sendBytes(ByteBuffer.wrap(file))
+            }
         }
     }
 
@@ -326,7 +336,7 @@ open class MessageObject(parent:MessageCenter) : WebSocketAdapter() {
      */
     override public fun onWebSocketBinary(payload: ByteArray?, offset: Int, len: Int) {
         if (payload != null) {
-            var checkSumEngine = Adler32()
+            var checkSumEngine = CRC32()
             checkSumEngine.update(payload)
             val checksum = checkSumEngine.value
             if (msgCenter.file_requests.containsKey(checksum)) {

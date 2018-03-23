@@ -21,7 +21,7 @@ import org.junit.Before
 import java.io.FileInputStream
 import java.net.URI
 import java.nio.ByteBuffer
-import java.util.zip.Adler32
+import java.util.zip.CRC32
 
 /**
  * Created by andrey on 2/25/18.
@@ -330,7 +330,7 @@ class MessageCenterTest {
                         response.get("status_code").toString())
                 val stream = FileInputStream("src/test/resources/profile.png")
                 val img = stream.readBytes()
-                val checksumEngine = Adler32()
+                val checksumEngine = CRC32()
                 checksumEngine.update(img)
                 val img_checksum = checksumEngine.value
                 this.webSocketResponse = ""

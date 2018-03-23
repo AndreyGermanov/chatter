@@ -22,7 +22,7 @@ import utils.toJSONString
 import java.io.FileInputStream
 import java.nio.file.Files
 import java.nio.file.Paths
-import java.util.zip.Adler32
+import java.util.zip.CRC32
 
 
 /**
@@ -111,7 +111,7 @@ class MessageObjectTest {
         user.save(){}
         val stream = FileInputStream("src/test/resources/profile.png")
         val img = stream.readBytes()
-        val checksumEngine = Adler32()
+        val checksumEngine = CRC32()
         checksumEngine.update(img)
         val img_checksum = checksumEngine.value
         user.setProfileImage(img){}
@@ -184,7 +184,7 @@ class MessageObjectTest {
         val user = app.users.getBy("login","andrey") as User
         val stream = FileInputStream("src/test/resources/profile.png")
         val img = stream.readBytes()
-        val checksumEngine = Adler32()
+        val checksumEngine = CRC32()
         checksumEngine.update(img)
         val img_checksum = checksumEngine.value
         app.users.activate(user!!["_id"].toString()){}
@@ -332,7 +332,7 @@ class MessageObjectTest {
         wsHandler.lastResponse = ""
         val stream = FileInputStream("src/test/resources/profile.png")
         val img = stream.readBytes()
-        val checksumEngine = Adler32()
+        val checksumEngine = CRC32()
         checksumEngine.update(img)
         val img_checksum = checksumEngine.value
         app.msgServer.runCronjob()
