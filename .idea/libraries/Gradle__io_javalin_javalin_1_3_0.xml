@@ -2,10 +2,12 @@
   <library name="Gradle: io.javalin:javalin:1.3.0">
     <CLASSES>
       <root url="jar:///data/home/andrey/.gradle/caches/modules-2/files-2.1/io.javalin/javalin/1.3.0/55c391dfaaeb119b247ca4872c48104d244205b/javalin-1.3.0.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.javalin/javalin/1.3.0/55c391dfaaeb119b247ca4872c48104d244205b/javalin-1.3.0.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>
       <root url="jar:///data/home/andrey/.gradle/caches/modules-2/files-2.1/io.javalin/javalin/1.3.0/2890853a03de1e4fc544f4c16095de37a48e802/javalin-1.3.0-sources.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.javalin/javalin/1.3.0/2890853a03de1e4fc544f4c16095de37a48e802/javalin-1.3.0-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

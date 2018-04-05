@@ -25,117 +25,6 @@ import java.util.*
 class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colName) {
 
     /**
-     * User registration result codes
-     */
-    enum class UserRegisterResultCode {
-        RESULT_OK,
-        RESULT_ERROR_LOGIN_EXISTS,
-        RESULT_ERROR_EMAIL_EXISTS,
-        RESULT_ERROR_NO_LOGIN,
-        RESULT_ERROR_NO_PASSWORD,
-        RESULT_ERROR_NO_EMAIL,
-        RESULT_ERROR_ACTIVATION_EMAIL,
-        RESULT_ERROR_UNKNOWN;
-        fun getMessage():String {
-            var result = ""
-            when(this) {
-                RESULT_OK -> result = "You are registered. Activation email sent. Please, open it and activate your account"
-                RESULT_ERROR_LOGIN_EXISTS -> result = "User with provided login already exists."
-                RESULT_ERROR_EMAIL_EXISTS -> result = "User with provided email already exists."
-                RESULT_ERROR_NO_LOGIN -> result = "Login is required."
-                RESULT_ERROR_NO_PASSWORD -> result = "Password is required."
-                RESULT_ERROR_NO_EMAIL -> result = "Email is required."
-                RESULT_ERROR_ACTIVATION_EMAIL -> result = "Failed to send activation email. Please contact support."
-                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support"
-            }
-            return result
-        }
-    }
-
-    /**
-     * User activation result codes
-     */
-    enum class UserActivationResultCode {
-        RESULT_OK,
-        RESULT_ERROR_NO_USER,
-        RESULT_ERROR_USER_ALREADY_ACTIVATED,
-        RESULT_ERROR_UNKNOWN;
-        fun getMessage(): String {
-            var result = ""
-            when (this) {
-                RESULT_OK -> result = "Activation successful. You can login now."
-                RESULT_ERROR_NO_USER -> result = "User account not found. Please, try to register again or contact support."
-                RESULT_ERROR_USER_ALREADY_ACTIVATED -> result = "User account already activated. You can login now."
-                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please, contact support."
-            }
-            return result
-        }
-        fun getHttpResponseCode(): Int {
-            var result = 200
-            when (this) {
-                RESULT_OK -> result = 200
-                RESULT_ERROR_NO_USER -> result = 406
-                RESULT_ERROR_USER_ALREADY_ACTIVATED -> result = 409
-                RESULT_ERROR_UNKNOWN -> result = 500
-            }
-            return result
-
-        }
-    }
-
-    /**
-     * User login result codes
-     */
-    enum class UserLoginResultCode {
-        RESULT_OK,
-        RESULT_ERROR_NOT_ACTIVATED,
-        RESULT_ERROR_INCORRECT_LOGIN,
-        RESULT_ERROR_INCORRECT_PASSWORD,
-        RESULT_ERROR_ALREADY_LOGIN,
-        RESULT_ERROR_UNKNOWN;
-        fun getMessage(): String {
-            var result = ""
-            when (this) {
-                RESULT_ERROR_NOT_ACTIVATED -> result = "Please, activate this account. Open activation email."
-                RESULT_ERROR_INCORRECT_LOGIN -> result = "Incorrect login."
-                RESULT_ERROR_INCORRECT_PASSWORD -> result = "Incorrect password."
-                RESULT_ERROR_ALREADY_LOGIN -> result = "User already in the system."
-                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support."
-            }
-            return result;
-        }
-    }
-
-    /**
-     * User update result codes
-     */
-    enum class UserUpdateResultCode {
-        RESULT_OK,
-        RESULT_OK_PENDING_IMAGE_UPLOAD,
-        RESULT_ERROR_IMAGE_UPLOAD,
-        RESULT_ERROR_USER_NOT_SPECIFIED,
-        RESULT_ERROR_USER_NOT_FOUND,
-        RESULT_ERROR_FIELD_IS_EMPTY,
-        RESULT_ERROR_INCORRECT_FIELD_VALUE,
-        RESULT_ERROR_PASSWORDS_SHOULD_MATCH,
-        RESULT_UNKNOWN;
-        fun getMessage():String {
-            var result = ""
-            when(this) {
-                RESULT_OK -> result = "Settings update successfully."
-                RESULT_OK_PENDING_IMAGE_UPLOAD -> result = "Settings update successfully."
-                RESULT_ERROR_IMAGE_UPLOAD -> result = "Error upload profile image. Please try again."
-                RESULT_ERROR_USER_NOT_SPECIFIED -> result = "User not found. Please, contact support."
-                RESULT_ERROR_FIELD_IS_EMPTY -> result = "Field is required."
-                RESULT_ERROR_INCORRECT_FIELD_VALUE -> result = "Incorrect field value."
-                RESULT_ERROR_PASSWORDS_SHOULD_MATCH -> result = "Passwords should match."
-                RESULT_UNKNOWN -> result = "Unknown error. Please,contact support."
-            }
-            return result
-        }
-    }
-
-    /**
      * Schema of database model
      */
     override var schema = hashMapOf(
@@ -148,7 +37,8 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             "first_name" to "String",
             "last_name" to "String",
             "gender" to "String",
-            "birthDate" to "Int"
+            "birthDate" to "Int",
+            "role" to "Int"
     ) as HashMap<String,String>
 
     val SALT_ROUNDS = 12
@@ -195,6 +85,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 user["email"] = params.get("email").toString()
                 user["password"] = BCrypt.hashpw(params.get("password").toString(),BCrypt.gensalt(SALT_ROUNDS))
                 user["active"] = false
+                user["role"] = 1
                 user.save {
                     app.smtpClient.init(user["email"].toString(),"Chatter Account Activation")
                     val result = app.smtpClient.sendMessage("Please, follow this link to activate your Chatter account "+
@@ -383,11 +274,200 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                         }
                     }
                 }
+                if (params.contains("role")) {
+                    if (params.get("role").toString().trim().isEmpty()) {
+                        callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY,"role")
+                        return
+                    }
+                    var role:UserRole? = null
+                    try {
+                        role = UserRole.valueOf(params.get("role").toString().trim())
+                    } catch (e:Exception) {}
+                    if (role == null) {
+                        callback(UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE,"role")
+                        return
+                    }
+                    user["role"] = role.value
+                }
                 user.save{
                     ChatApplication.users.addModel(user)
                     callback(UserUpdateResultCode.RESULT_OK,"")
                 }
             }
+        }
+    }
+    /**
+     * User registration result codes
+     */
+    enum class UserRegisterResultCode {
+        RESULT_OK,
+        RESULT_ERROR_LOGIN_EXISTS,
+        RESULT_ERROR_EMAIL_EXISTS,
+        RESULT_ERROR_NO_LOGIN,
+        RESULT_ERROR_NO_PASSWORD,
+        RESULT_ERROR_NO_EMAIL,
+        RESULT_ERROR_ACTIVATION_EMAIL,
+        RESULT_ERROR_UNKNOWN;
+        fun getMessage():String {
+            var result = ""
+            when(this) {
+                RESULT_OK -> result = "You are registered. Activation email sent. Please, open it and activate your account"
+                RESULT_ERROR_LOGIN_EXISTS -> result = "User with provided login already exists."
+                RESULT_ERROR_EMAIL_EXISTS -> result = "User with provided email already exists."
+                RESULT_ERROR_NO_LOGIN -> result = "Login is required."
+                RESULT_ERROR_NO_PASSWORD -> result = "Password is required."
+                RESULT_ERROR_NO_EMAIL -> result = "Email is required."
+                RESULT_ERROR_ACTIVATION_EMAIL -> result = "Failed to send activation email. Please contact support."
+                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support"
+            }
+            return result
+        }
+    }
+
+    /**
+     * User activation result codes
+     */
+    enum class UserActivationResultCode {
+        RESULT_OK,
+        RESULT_ERROR_NO_USER,
+        RESULT_ERROR_USER_ALREADY_ACTIVATED,
+        RESULT_ERROR_UNKNOWN;
+        fun getMessage(): String {
+            var result = ""
+            when (this) {
+                RESULT_OK -> result = "Activation successful. You can login now."
+                RESULT_ERROR_NO_USER -> result = "User account not found. Please, try to register again or contact support."
+                RESULT_ERROR_USER_ALREADY_ACTIVATED -> result = "User account already activated. You can login now."
+                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please, contact support."
+            }
+            return result
+        }
+        fun getHttpResponseCode(): Int {
+            var result = 200
+            when (this) {
+                RESULT_OK -> result = 200
+                RESULT_ERROR_NO_USER -> result = 406
+                RESULT_ERROR_USER_ALREADY_ACTIVATED -> result = 409
+                RESULT_ERROR_UNKNOWN -> result = 500
+            }
+            return result
+
+        }
+    }
+
+    /**
+     * User login result codes
+     */
+    enum class UserLoginResultCode {
+        RESULT_OK,
+        RESULT_ERROR_NOT_ACTIVATED,
+        RESULT_ERROR_INCORRECT_LOGIN,
+        RESULT_ERROR_INCORRECT_PASSWORD,
+        RESULT_ERROR_ALREADY_LOGIN,
+        RESULT_ERROR_UNKNOWN;
+        fun getMessage(): String {
+            var result = ""
+            when (this) {
+                RESULT_ERROR_NOT_ACTIVATED -> result = "Please, activate this account. Open activation email."
+                RESULT_ERROR_INCORRECT_LOGIN -> result = "Incorrect login."
+                RESULT_ERROR_INCORRECT_PASSWORD -> result = "Incorrect password."
+                RESULT_ERROR_ALREADY_LOGIN -> result = "User already in the system."
+                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support."
+            }
+            return result;
+        }
+    }
+
+    /**
+     * User update result codes
+     */
+    enum class UserUpdateResultCode {
+        RESULT_OK,
+        RESULT_OK_PENDING_IMAGE_UPLOAD,
+        RESULT_ERROR_IMAGE_UPLOAD,
+        RESULT_ERROR_USER_NOT_SPECIFIED,
+        RESULT_ERROR_USER_NOT_FOUND,
+        RESULT_ERROR_FIELD_IS_EMPTY,
+        RESULT_ERROR_INCORRECT_FIELD_VALUE,
+        RESULT_ERROR_PASSWORDS_SHOULD_MATCH,
+        RESULT_UNKNOWN;
+        fun getMessage():String {
+            var result = ""
+            when(this) {
+                RESULT_OK -> result = "Settings update successfully."
+                RESULT_OK_PENDING_IMAGE_UPLOAD -> result = "Settings update successfully."
+                RESULT_ERROR_IMAGE_UPLOAD -> result = "Error upload profile image. Please try again."
+                RESULT_ERROR_USER_NOT_SPECIFIED -> result = "User not found. Please, contact support."
+                RESULT_ERROR_FIELD_IS_EMPTY -> result = "Field is required."
+                RESULT_ERROR_INCORRECT_FIELD_VALUE -> result = "Incorrect field value."
+                RESULT_ERROR_PASSWORDS_SHOULD_MATCH -> result = "Passwords should match."
+                RESULT_UNKNOWN -> result = "Unknown error. Please,contact support."
+            }
+            return result
+        }
+    }
+
+    /**
+     * User role definitions
+     */
+    enum class UserRole(val value:Int) {
+        USER(1),
+        ADMIN(2)
+    }
+
+    /**
+     * User login action definitions (user can make this actions without user_id)
+     */
+    enum class UserLoginAction(val value:String) {
+        register_user("register_user"),
+        login_user("login_user");
+        companion object {
+            fun Is(value: String): UserLoginAction? {
+                var result: UserLoginAction? = null
+                try {
+                    result = UserLoginAction.valueOf(value)
+                } catch (e: Exception) {
+                }
+                return result
+            }
+        }
+    }
+
+    /**
+     * User application action definitions (user can make this actions only after login
+     * with user_id and session_id)
+     */
+    enum class UserAppAction(val value:String) {
+        update_user("update_user"),
+        logout_user("logout_user");
+        companion object {
+            fun Is(value: String): UserAppAction? {
+                var result: UserAppAction? = null
+                try {
+                    result = UserAppAction.valueOf(value)
+                } catch (e: Exception) {
+                }
+                return result
+            }
+        }
+    }
+
+    /**
+     * User admin actions. User can do these actions only if it logged (has user_id and session_id)
+     * and has "ADMIN" role
+     */
+    enum class UserAdminAction(val value:String) {
+        admin_get_users_list("admin_get_users_list"),
+        admin_get_user("admin_get_user"),
+        admin_update_user("admin_update_user"),
+        admin_remove_user("admin_remove_user");
+        fun Is(value: String): UserAdminAction? {
+            var result: UserAdminAction? = null
+            try {
+                result = UserAdminAction.valueOf(value)
+            } catch (e: Exception) {
+            }
+            return result
         }
     }
 }

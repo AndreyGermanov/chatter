@@ -7,12 +7,11 @@ import com.mongodb.client.MongoDatabase
  *
  * @param db Main MongoDB database instance
  * @property db Main MongoDB database instance
+ *
+ * @param db_host: Host name of database server
+ * @param db_name: Database name
  */
-public class DB(db_name:String = "chatter") {
+public class DB(db_name:String = "chatter",db_host:String="localhost") {
+    var db: MongoDatabase = MongoClient(db_host).getDatabase(db_name)
 
-    var db: MongoDatabase
-
-    init {
-        this.db = MongoClient().getDatabase(db_name)
-    }
 }

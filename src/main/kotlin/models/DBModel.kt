@@ -59,8 +59,9 @@ open class DBModel(db:MongoDatabase,colName:String) {
      */
     operator fun set(index:String,value:Any) {
         if (schema.contains(index)) {
+            println(index+'-'+value.toString())
             when (schema.get(index)) {
-                "Int" -> doc.set(index, Integer.parseInt(value.toString()))
+                "Int" -> doc.set(index, value.toString().toDouble().toInt())
                 "Boolean" -> doc.set(index, value as Boolean)
                 "String" -> doc.set(index, value.toString())
                 "Long" -> doc.set(index, value.toString().toLong())

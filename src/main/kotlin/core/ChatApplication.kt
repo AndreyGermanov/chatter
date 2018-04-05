@@ -7,6 +7,8 @@ import interactors.Sessions
 import interactors.Users
 import io.javalin.Javalin
 import io.javalin.embeddedserver.Location
+import utils.LogLevel
+import utils.Logger
 import utils.SendMail
 
 /**
@@ -48,11 +50,11 @@ object ChatApplication {
 
     var usersPath = rootPath + "/users"
 
-    var host = "http://192.168.0.184"
+    var host = "http://192.168.0.214"
 
     var port = 8080
 
-    var static_files_path = "/var/www/html/public"
+    var static_files_path = "opt/chatter/public"
 
     var smtpClient = SendMail()
 
@@ -61,18 +63,24 @@ object ChatApplication {
      * main collections from database
      */
     fun run() {
-
+        Logger.log(LogLevel.DEBUG,"Starting application","ChatApplication","run")
+        Logger.log(LogLevel.DEBUG,"Setting database server","ChatApplication","run")
         this.dBServer = DB()
+        Logger.log(LogLevel.DEBUG,"Loading main database collections","ChatApplication","run")
         this.users = Users(this.dBServer.db,"users")
         this.rooms = Rooms(this.dBServer.db,"rooms")
         this.sessions = Sessions(this.dBServer.db,"sessions")
         this.rooms.loadList(null){}
         this.users.loadList(null){}
         this.sessions.loadList(null){}
-
+        Logger.log(LogLevel.DEBUG,"Starting Web Server","ChatApplication","run")
         this.webServer = Javalin.create()
+        Logger.log(LogLevel.DEBUG,"Configuring Web Server...","ChatApplication","run")
+        Logger.log(LogLevel.DEBUG,"Setting port of Web Server","ChatApplication","run")
         this.webServer.port(port)
+        Logger.log(LogLevel.DEBUG,"Setting root path of static files o Web Server","ChatApplication","run")
         this.webServer.enableStaticFiles(static_files_path,Location.EXTERNAL)
+        Logger.log(LogLevel.DEBUG,"Initializing message center","ChatApplication","run")
         this.msgServer = MessageCenter()
         this.webServer.start()
     }
