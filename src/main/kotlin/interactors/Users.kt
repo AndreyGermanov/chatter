@@ -412,62 +412,21 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
      */
     enum class UserRole(val value:Int) {
         USER(1),
-        ADMIN(2)
-    }
-
-    /**
-     * User login action definitions (user can make this actions without user_id)
-     */
-    enum class UserLoginAction(val value:String) {
-        register_user("register_user"),
-        login_user("login_user");
+        ADMIN(2);
         companion object {
-            fun Is(value: String): UserLoginAction? {
-                var result: UserLoginAction? = null
-                try {
-                    result = UserLoginAction.valueOf(value)
-                } catch (e: Exception) {
+            /**
+             * Function returns role enum by code of role
+             *
+             * @return UserRole
+             */
+            public fun getValueByCode(code:Int):UserRole {
+                var result = USER
+                when (code) {
+                    1 -> result = USER
+                    2 -> result = ADMIN
                 }
                 return result
             }
-        }
-    }
-
-    /**
-     * User application action definitions (user can make this actions only after login
-     * with user_id and session_id)
-     */
-    enum class UserAppAction(val value:String) {
-        update_user("update_user"),
-        logout_user("logout_user");
-        companion object {
-            fun Is(value: String): UserAppAction? {
-                var result: UserAppAction? = null
-                try {
-                    result = UserAppAction.valueOf(value)
-                } catch (e: Exception) {
-                }
-                return result
-            }
-        }
-    }
-
-    /**
-     * User admin actions. User can do these actions only if it logged (has user_id and session_id)
-     * and has "ADMIN" role
-     */
-    enum class UserAdminAction(val value:String) {
-        admin_get_users_list("admin_get_users_list"),
-        admin_get_user("admin_get_user"),
-        admin_update_user("admin_update_user"),
-        admin_remove_user("admin_remove_user");
-        fun Is(value: String): UserAdminAction? {
-            var result: UserAdminAction? = null
-            try {
-                result = UserAdminAction.valueOf(value)
-            } catch (e: Exception) {
-            }
-            return result
         }
     }
 }
