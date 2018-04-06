@@ -55,7 +55,7 @@ class Sessions(db:MongoDatabase,colName:String): DBCollection(db,colName) {
      */
     override fun addModel(model:Any) {
         var session = model as DBModel
-        if (ChatApplication.users.getBy("user_id",session["user_id"].toString())==null) {
+        if (ChatApplication.sessions.getBy("user_id",session["user_id"].toString())==null) {
             super.addModel(model)
         }
     }

@@ -34,11 +34,11 @@ import utils.SendMail
  */
 object ChatApplication {
 
-    lateinit var webServer : Javalin
+    var webServer : Javalin = Javalin.create()
 
     lateinit var dBServer: DB
 
-    lateinit var msgServer: MessageCenter
+    var msgServer = MessageCenter
 
     lateinit var users: Users
 
@@ -73,15 +73,14 @@ object ChatApplication {
         this.rooms.loadList(null){}
         this.users.loadList(null){}
         this.sessions.loadList(null){}
-        Logger.log(LogLevel.DEBUG,"Starting Web Server","ChatApplication","run")
-        this.webServer = Javalin.create()
+        Logger.log(LogLevel.DEBUG,"Initializing message center","ChatApplication","run")
+        this.msgServer.setup()
         Logger.log(LogLevel.DEBUG,"Configuring Web Server...","ChatApplication","run")
         Logger.log(LogLevel.DEBUG,"Setting port of Web Server","ChatApplication","run")
         this.webServer.port(port)
         Logger.log(LogLevel.DEBUG,"Setting root path of static files o Web Server","ChatApplication","run")
         this.webServer.enableStaticFiles(static_files_path,Location.EXTERNAL)
-        Logger.log(LogLevel.DEBUG,"Initializing message center","ChatApplication","run")
-        this.msgServer = MessageCenter()
+        Logger.log(LogLevel.DEBUG,"Starting Web Server","ChatApplication","run")
         this.webServer.start()
     }
 }

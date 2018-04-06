@@ -45,10 +45,11 @@ class MessageCenterTest {
         app.users = Users(app.dBServer.db,"users")
         app.sessions = Sessions(app.dBServer.db,"sessions")
         app.webServer = Javalin.create()
-        app.msgServer = MessageCenter()
+        app.msgServer = MessageCenter
         app.host = "http://localhost"
         app.port = 8081
         app.webServer.port(app.port)
+        app.msgServer.setup()
         app.webServer.enableStaticFiles(ChatApplication.static_files_path, Location.EXTERNAL)
         app.webServer.start()
         ws.delegate = this
@@ -95,7 +96,7 @@ class MessageCenterTest {
         Thread.sleep(200)
         var response = parser.parse(this.webSocketResponse) as JSONObject
         assertEquals("Should return system error if not correct message format sent",
-                MessageObject.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),
+                MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),
                 response.get("status_code").toString())
         this.webSocketResponse = ""
         session.remote.sendString("{\"request_id\":\"12345\",\"action\":\"register_user\"}")
@@ -283,19 +284,19 @@ class MessageCenterTest {
         session.remote.sendString("""{"request_id":"12345","action":"update_user"}""")
         Thread.sleep(200)
         var response = parser.parse(this.webSocketResponse) as JSONObject
-        assertEquals("Should fail if user_id is not provided",MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
+        assertEquals("Should fail if user_id is not provided",MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
                 response.get("status_code").toString())
         this.webSocketResponse = ""
         session.remote.sendString("""{"request_id":"12345","action":"update_user","user_id":""}""")
         Thread.sleep(200)
         response = parser.parse(this.webSocketResponse) as JSONObject
-        assertEquals("Should fail if empty user_id provided",MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
+        assertEquals("Should fail if empty user_id provided",MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
                 response.get("status_code").toString())
         this.webSocketResponse = ""
         session.remote.sendString("""{"request_id":"12345","action":"update_user","user_id":"sdsdfs"}""")
         Thread.sleep(200)
         response = parser.parse(this.webSocketResponse) as JSONObject
-        assertEquals("Should fail if incorrect user_id provided",MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
+        assertEquals("Should fail if incorrect user_id provided",MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
                 response.get("status_code").toString())
         val request = JSONObject()
         request.set("request_id","12345")
@@ -309,14 +310,14 @@ class MessageCenterTest {
             Thread.sleep(200)
             response = parser.parse(this.webSocketResponse) as JSONObject
             assertEquals("Should fail if session_id is not provided",
-                    MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
+                    MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
                     response.get("status_code").toString())
             this.webSocketResponse = ""
             session.remote.sendString("""{"request_id":"12345","action":"update_user","user_id":"""" + user!!["_id"] + """","session_id":"123"}""")
             Thread.sleep(200)
             response = parser.parse(this.webSocketResponse) as JSONObject
             assertEquals("Should fail if incorrect session_id provided",
-                    MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
+                    MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),
                     response.get("status_code").toString())
             app.users.login("andrey","pass") { result_code,result ->
                 val sess = app.sessions.getBy("user_id",user!!["_id"].toString()) as models.Session

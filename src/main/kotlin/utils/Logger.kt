@@ -47,7 +47,7 @@ object Logger {
     fun log(logLevel:LogLevel = LogLevel.INFO, message:String, className:String="",methodName:String="") {
         if (this.loggerLevels.contains(logLevel)) {
             var date = Date()
-            println(this.formatDate(date)+" - "+logLevel.name+": "+message+" ("+className+","+methodName+")")
+            println(this.formatDate(date)+" - "+logLevel.name+": "+className+","+methodName+" - " + message)
         }
     }
 }

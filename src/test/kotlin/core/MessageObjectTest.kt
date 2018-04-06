@@ -6,6 +6,7 @@ import interactors.Rooms
 import interactors.Sessions
 import interactors.Users
 import io.javalin.Javalin
+import io.javalin.embeddedserver.jetty.websocket.WsSession
 import models.Room
 import models.Session
 import models.User
@@ -32,7 +33,7 @@ import java.util.zip.CRC32
 class MessageObjectTest {
 
     val app = ChatApplication
-    lateinit var wsHandler: MessageObject
+    var wsHandler = MessageCenter
     lateinit var db: MongoDatabase
     val parser = JSONParser()
 
@@ -41,8 +42,8 @@ class MessageObjectTest {
         app.dBServer = DB("test")
         app.webServer = Javalin.create()
         app.port = 8082
-        app.msgServer = MessageCenter()
-        wsHandler = app.msgServer.wsHandler as MessageObject
+        app.msgServer = MessageCenter
+        wsHandler = app.msgServer
         db = app.dBServer.db
         db.getCollection("users").deleteMany(Document())
         db.getCollection("sessions").deleteMany(Document())
@@ -264,26 +265,26 @@ class MessageObjectTest {
         } catch (e:Exception) {
             fail("Should return correct JSON")
         }
-        assertEquals("Should fail if no message provided",MessageObject.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code"))
+        assertEquals("Should fail if no message provided",MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code"))
         wsHandler.onWebSocketText("}action:5{")
         response = parser.parse(wsHandler.lastResponse) as JSONObject
-        assertEquals("Should fail if incorrect JSON message provided",MessageObject.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code"))
+        assertEquals("Should fail if incorrect JSON message provided",MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code"))
         wsHandler.onWebSocketText("8F?????'+-4ss??????/14467>>????<<@@flpt8?BDFF????????????????3:==?@????????'%'+068=???????????j?j0k6k?o?o????g?i?{???????????B?D??6?;?l?u?u??????????????????!?#?$?&?*?????D?J??@`'kg'i''??_?n?t?n?(?}???}???}???}???}???}?????o}??}??}???}??????????'?-?4?}?;?}?F?}?M?}?Y?}?`?}?l?}?s?}??}???}??")
         response = parser.parse(wsHandler.lastResponse) as JSONObject
-        assertEquals("Should fail if garbage binary data provided",MessageObject.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code"))
+        assertEquals("Should fail if garbage binary data provided",MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code"))
         var request = JSONObject()
         request.set("request_id","")
         wsHandler.onWebSocketText(toJSONString(request))
         response = parser.parse(wsHandler.lastResponse) as JSONObject
-        assertEquals("Should fail if request_id is empty",MessageObject.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code").toString())
+        assertEquals("Should fail if request_id is empty",MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code").toString())
         request.set("request_id","12345")
         wsHandler.onWebSocketText(toJSONString(request))
         response = parser.parse(wsHandler.lastResponse) as JSONObject
-        assertEquals("Should fail if no user_id provided (except register_user and login_user_actions",MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
+        assertEquals("Should fail if no user_id provided (except register_user and login_user actions)",MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
         request.set("user_id","boom")
         wsHandler.onWebSocketText(toJSONString(request))
         response = parser.parse(wsHandler.lastResponse) as JSONObject
-        assertEquals("Should fail if provided user_id is not correct",MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
+        assertEquals("Should fail if provided user_id is not correct",MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
         val userObj = JSONObject()
         userObj.set("login","andrey")
         userObj.set("email","andrey@it-port.ru")
@@ -292,31 +293,33 @@ class MessageObjectTest {
             request.set("user_id",user!!["_id"].toString())
             wsHandler.onWebSocketText(toJSONString(request))
             response = parser.parse(wsHandler.lastResponse) as JSONObject
-            assertEquals("Should fail if no session_id provided",MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
+            assertEquals("Should fail if no session_id provided",MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
             request.set("session_id","")
             wsHandler.onWebSocketText(toJSONString(request))
             response = parser.parse(wsHandler.lastResponse) as JSONObject
-            assertEquals("Should fail if empty session_id provided",MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
+            assertEquals("Should fail if empty session_id provided",MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
             request.set("session_id","12323")
+            request.set("action","update_user")
             wsHandler.onWebSocketText(toJSONString(request))
             response = parser.parse(wsHandler.lastResponse) as JSONObject
-            assertEquals("Should fail if incorrect session_id provided",MessageObject.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
+            assertEquals("Should fail if incorrect session_id provided",MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.toString(),response.get("status_code").toString())
             user["active"] = true
+            request.remove("action")
             user.save{}
             app.users.login("andrey","pass") { result_code,result ->
                 val user_session = app.sessions.getBy("user_id",user["_id"].toString()) as models.Session
                 request.set("session_id",user_session["_id"].toString())
                 wsHandler.onWebSocketText(toJSONString(request))
                 response = parser.parse(wsHandler.lastResponse) as JSONObject
-                assertEquals("Should fail if no action provided",MessageObject.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code").toString())
+                assertEquals("Should fail if no action provided",MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code").toString())
                 request.set("action","")
                 wsHandler.onWebSocketText(toJSONString(request))
                 response = parser.parse(wsHandler.lastResponse) as JSONObject
-                assertEquals("Should fail if empty action provided",MessageObject.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code").toString())
+                assertEquals("Should fail if empty action provided",MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code").toString())
                 request.set("action","boom")
                 wsHandler.onWebSocketText(toJSONString(request))
                 response = parser.parse(wsHandler.lastResponse) as JSONObject
-                assertEquals("Should fail if incorrect action provided",MessageObject.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code").toString())
+                assertEquals("Should fail if incorrect action provided",MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.toString(),response.get("status_code").toString())
                 request.set("action","update_user")
                 wsHandler.onWebSocketText(toJSONString(request))
                 response = parser.parse(wsHandler.lastResponse) as JSONObject
