@@ -10,8 +10,8 @@ import utils.LogLevel
 import utils.Logger
 
 /**
- * Singleton object used to route incoming action to appropriate controller, execute aciton executor of controller
- * and return result
+ * Singleton object used to route incoming action to appropriate controller, to call appropriate action handler
+ * of controller and return result
  *
  * @param request: Received request
  * @param session: Client WebSocket session instance
@@ -28,31 +28,41 @@ object ActionRouter {
      */
     fun processAction(request: JSONObject, session: Session?):JSONObject {
         Logger.log(LogLevel.DEBUG,"Begin routing request to Controller action. " +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}" +
+                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
                 "Request: $request", "ActionRouter","processAction")
         val system_error_response = JSONObject()
         system_error_response.set("status","error")
         system_error_response.set("status_code", MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR)
         system_error_response.set("message", MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.getMessage())
-        if (!request.containsKey("request_id") || !request.get("request_id").toString().isEmpty()) {
+        if (!request.containsKey("request_id") || request.get("request_id").toString().isEmpty()) {
             Logger.log(LogLevel.WARNING,"Received request with incorrect request_id. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}" +
+                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
                     "Request : $request", "ActionRouter","processAction")
             return system_error_response
         }
-        var action = request["action"].toString()
-        if (LoginController.action(action)!=null) {
-            return LoginController.auth(request,session) ?: LoginController.action(action)!!.exec(request,session)
-        } else if (UserController.action(action)!=null) {
-            return UserController.auth(request,session) ?: UserController.action(action)!!.exec(request,session)
-        } else if (AdminController.action(action)!=null) {
-            return AdminController.auth(request, session) ?: AdminController.action(action)!!.exec(request, session)
-        } else {
+        var actionName = request["action"].toString()
+        var action: WebSocketController? = LoginController.action(actionName) ?: UserController.action(actionName)
+        if (action == null) {
+            action = AdminController.action(actionName)
+        }
+        if (action == null) {
             Logger.log(LogLevel.WARNING,"Could not find controller and handler for provided action '$action'. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}" +
+                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
                     "Request: $request", "ActionRouter","processAction")
             return system_error_response
         }
+        Logger.log(LogLevel.DEBUG,"Routing request to appropriate action of controller." +
+                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
+                "Request : $request", "ActionRouter","processAction")
+        var auth_response = action.auth(request,session)
+        if (auth_response!=null) {
+            Logger.log(LogLevel.DEBUG, "Request did not pass authentification on controller." +
+                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
+                    "Request : $request", "ActionRouter", "processAction")
+            return auth_response
+        }
+        var request = action.before(request);
+        return action.after(request,action.exec(request,session),session)
     }
 }
 

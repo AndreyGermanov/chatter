@@ -349,7 +349,54 @@ class MessageCenterTest {
             }
 
         }
+    }
 
+    @Test
+    fun logoutUser() {
+        var request = JSONObject(mapOf(
+                "action" to "logout_user",
+                "request_id" to "12345",
+                "user_id" to "12345",
+                "session_id" to "12345"))
+        session.remote.sendString(request.toString())
+        Thread.sleep(100)
+        var response = parser.parse(this.webSocketResponse) as JSONObject
+        this.webSocketResponse = ""
+        assertEquals("Should return error, if incorrect user_id provided", "error", response["status"].toString())
+        request.set("request_id","12345")
+        request.set("login","andrey")
+        request.set("email","andrey@it-port.ru")
+        request.set("password","pass")
+        request.set("confirm_password","pass")
+        app.users.register(request) { result_code, user ->
+            if (user!=null) {
+                user!!["active"] = true
+                user.save {}
+            }
+            session.remote.sendString(JSONObject(mapOf(
+                    "request_id" to "12345",
+                    "action" to "login_user",
+                    "login" to "andrey",
+                    "password" to "pass"
+            )).toString())
+            Thread.sleep(1000)
+            var response = parser.parse(this.webSocketResponse) as JSONObject
+            var user_id = response!!["user_id"]!!.toString()
+            var session_id = response!!["session_id"]!!.toString()
+            assertEquals("Should be one session after user login", 1, app.sessions.count())
+            request = JSONObject(mapOf(
+                    "request_id" to "12345",
+                    "action" to "logout_user",
+                    "user_id" to user_id,
+                    "session_id" to session_id
+            ))
+            session.remote.sendString(request.toString())
+            Thread.sleep(200)
+            response = parser.parse(this.webSocketResponse) as JSONObject
+            this.webSocketResponse = ""
+            assertEquals("Should return ok, if correct user_id and session_id provided", "ok", response["status"].toString())
+            assertEquals("Should remove user session from sessions collection", 0, app.sessions.count())
+        }
     }
 
 }

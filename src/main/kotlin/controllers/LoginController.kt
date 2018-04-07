@@ -3,6 +3,7 @@
  */
 package controllers
 
+import core.ChatApplication
 import core.MessageCenter
 import interactors.Users
 import models.Room
@@ -20,7 +21,7 @@ import java.util.zip.CRC32
 /**
  * Controller which represents set of actions, related to user login and registration
  */
-enum class LoginController(val value:String) {
+enum class LoginController(val value:String): WebSocketController {
     /**
      * Register user action. Handles user register requests
      */
@@ -221,15 +222,42 @@ enum class LoginController(val value:String) {
          *                  session_id - Session id of user
          * @param session - Client websocket session instance
          * @result JSONObject with result of operation:
-         *          status - "ok" or "error"
+         *          status - "ok" or "error",status_code="RESULT_OK"
          */
         override fun exec(request: JSONObject, session: Session?): JSONObject {
+            Logger.log(LogLevel.DEBUG,"Begin logout_user action for user '${request["username"]}'." +
+                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
+                    "LoginController","logout_user")
             var result = JSONObject()
+            ChatApplication.sessions.remove(request["session_id"].toString(), {})
+            result["status"] = "ok"
+            result["status_code"] = "RESULT_OK"
+            Logger.log(LogLevel.DEBUG,"Finished logout_user action for user '${request["username"]} successfully." +
+                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
+                    "LoginController","logout_user")
             return result
         }
+        override fun auth(request:JSONObject,session:Session?): JSONObject? {
+            return UserController.update_user.auth(request,session)
+        }
     };
-    open fun exec(request:JSONObject,session: Session?=null): JSONObject {
-        return JSONObject()
+
+    /**
+     * Function, which must be executed before any action to check, if request has
+     * enough authentication information to use actions of this controller
+     *
+     * @param request: Request to authenticate
+     * @param session: Client WebSocket session instance
+     * @return "null" if no authentication error or JSONObject with error description in following fields:
+     *         status - "error"
+     *         status_code - error code of type Users.UserLoginResultCode
+     */
+    override open fun auth(request:JSONObject,session:Session?):JSONObject? {
+        Logger.log(LogLevel.DEBUG,"Authentication on enter LoginController." +
+                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}","LoginController","auth")
+        Logger.log(LogLevel.DEBUG,"Authentication on enter LoginController passed successfully." +
+                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}","LoginController","auth")
+        return null
     }
     companion object {
         /**
@@ -246,24 +274,6 @@ enum class LoginController(val value:String) {
             } catch (e: Exception) {
             }
             return result
-        }
-
-        /**
-         * Function, which must be executed before any action to check, if request has
-         * enough authentication information to use actions of this controller
-         *
-         * @param request: Request to authenticate
-         * @param session: Client WebSocket session instance
-         * @return "null" if no authentication error or JSONObject with error description in following fields:
-         *         status - "error"
-         *         status_code - error code of type Users.UserLoginResultCode
-         */
-        fun auth(request:JSONObject,session:Session?=null):JSONObject? {
-            Logger.log(LogLevel.DEBUG,"Authentication on enter LoginController." +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}","LoginController","auth")
-            Logger.log(LogLevel.DEBUG,"Authentication on enter LoginController passed successfully." +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}","LoginController","auth")
-            return null
         }
     }
 }

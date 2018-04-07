@@ -178,7 +178,6 @@ object MessageCenter {
                 response = system_error_response
             } else {
                 response = ActionRouter.processAction(obj,session)
-                response["action"] = obj["action"].toString()
                 Logger.log(LogLevel.DEBUG,"Received response from ActionRouter " +
                         "Request : $obj, action : ${obj["action"]}, response: $response",
                         "MessageCenter","onWebSocketText")
@@ -186,7 +185,6 @@ object MessageCenter {
             }
             if (obj.containsKey("request_id")) {
                 system_error_response["request_id"] = obj["request_id"].toString()
-                response["request_id"] = obj["request_id"].toString()
             }
         } else {
             Logger.log(LogLevel.WARNING,"Received empty request without body. " +
@@ -401,7 +399,6 @@ open class MessageObject {
     @OnWebSocketMessage
     open fun onBinary(session:Session,buf:ByteArray,offset:Int,length:Int) {
         MessageCenter.onWebSocketBinary(buf,offset,length,session)
-
     }
 }
 
