@@ -38,32 +38,30 @@ enum class AdminController(val value:String): WebSocketController {
          *          total_count - total count of items in users collection, before applying condition,limit
          *          and offset
          */
-        override open fun exec(request:JSONObject, session:Session?): JSONObject {
+        override fun exec(request:JSONObject, session:Session?): JSONObject {
             var result = JSONObject()
             var usersArray = JSONArray()
             val username = request["username"].toString();
-            Logger.log(LogLevel.DEBUG, "Begin admin_get_users_list action. Username: $username. Remote IP: $sessionIP."+
-                    "Request: $request.","AdminController","admin_get_users_list.exec")
-            var users = ChatApplication.users.getList().iterator()
-
+            Logger.log(LogLevel.DEBUG, "Begin admin_get_users_list action. Username: $username. " +
+                    "Remote IP: $sessionIP. Request: $request.","AdminController","admin_get_users_list.exec")
             var query = this.prepareListQuery(request,session)
             if (query.containsKey("status") && query["status"] == "error") {
                 return query
             }
-
-            usersArray = ChatApplication.users.getListJSON(filter=query["filter"]?.toString() ?: "",
-                    fields=query["fields"] as? ArrayList<String> ?: ArrayList<String>(),
-                    offset=query["offset"]?.toString()?.toInt() ?: 0,limit=query["limit"]?.toString()?.toInt() ?: 0,
-                    sort=query["sort"] as? Pair<String,String> ?: null)
-            Logger.log(LogLevel.DEBUG,"Prepared list for admin_get_users_list_request. Username: $username," +
-                    "Remote IP: $sessionIP, Request: $request, List: $usersArray")
+            Logger.log(LogLevel.DEBUG,"Prepared query to users collection: $query. Username: $username," +
+                    "Remote IP: $sessionIP, request: $request","AdminController","admin_get_users_list.exec")
+            usersArray = ChatApplication.users.getListJSON(query)
+            Logger.log(LogLevel.DEBUG,"Prepared list for admin_get_users_list request. Username: $username," +
+                    "Remote IP: $sessionIP, Request: $request, List: $usersArray","AdminController",
+                    "admin_get_users_list.exec")
             if (usersArray.count()>0) {
                 result["status"] = "ok"
                 result["status_code"] = AdminControllerRequestResults.RESULT_OK
                 result["list"] = usersArray
             } else {
                 Logger.log(LogLevel.WARNING,"Prepared list for admin_get_users_list_request is empty. " +
-                        "Username: $username, Remote IP: $sessionIP, Request: $request")
+                        "Username: $username, Remote IP: $sessionIP, Request: $request","AdminController",
+                        "admin_get_users_list.exec")
                 result["status"] = "error"
                 result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_EMPTY_RESULT
             }
@@ -138,7 +136,7 @@ enum class AdminController(val value:String): WebSocketController {
      * If passed validation, returns prepared JSON object with params, prepared to pass to underlying query function.
      * Parms of successful result object are: limit,offset,filter,fields,sort
      */
-    open fun prepareListQuery(request:JSONObject,session:Session?): JSONObject{
+    open fun prepareListQuery(request:JSONObject,session:Session?): JSONObject {
         var query = JSONObject()
         var result = JSONObject()
         var fields = ArrayList<String>()
@@ -163,7 +161,7 @@ enum class AdminController(val value:String): WebSocketController {
             if (parseFieldsError) {
                 Logger.log(LogLevel.WARNING, "Could not parse 'fields' field of request to JSON." +
                         "Username: $username,Remote IP: $sessionIP, Request: $request",
-                        "AdminController","admin_get_users_list.exec")
+                        "AdminController","prepareListQuery")
                 result["status"] = "error"
                 result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
                 result["field"] = "fields"
@@ -172,7 +170,7 @@ enum class AdminController(val value:String): WebSocketController {
             if (request["fields"].toString().isEmpty() || fields.count()==0) {
                 Logger.log(LogLevel.WARNING,"Field list is empty. Nothing to return." +
                         "Username: $username,Remote IP: $sessionIP, Request: $request",
-                        "AdminController","admin_get_users_list.exec")
+                        "AdminController","prepareListQuery")
                 result["status"] = "error"
                 result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
                 result["field"] = "fields"
@@ -183,7 +181,7 @@ enum class AdminController(val value:String): WebSocketController {
         if (request.containsKey("filter") && request["filter"].toString().trim().count()==0) {
             Logger.log(LogLevel.WARNING,"Filter is empty. Either not provide filter, or provide any value in it" +
                     "Username: $username,Remote IP: $sessionIP, Request: $request",
-                    "AdminController","admin_get_users_list.exec")
+                    "AdminController","prepareListQuery")
             result["status"] = "error"
             result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
             result["field"] = "filter"
@@ -196,7 +194,7 @@ enum class AdminController(val value:String): WebSocketController {
             if (request["offset"].toString().trim().count()==0) {
                 Logger.log(LogLevel.WARNING,"Offset is empty. Offset should be 0 or positive value. Username: " +
                         "$username,Remote IP: $sessionIP, Request: $request",
-                        "AdminController","admin_get_users_list.exec")
+                        "AdminController","prepareListQuery")
                 offsetFailure = true
                 result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
             } else {
@@ -205,7 +203,7 @@ enum class AdminController(val value:String): WebSocketController {
                 } catch (e:Exception) {
                     Logger.log(LogLevel.WARNING,"Incorrect offset. Offset should be 0 or positive value. Username: " +
                             "$username,Remote IP: $sessionIP, Request: $request",
-                            "AdminController","admin_get_users_list.exec")
+                            "AdminController","prepareListQuery")
                     offsetFailure = true
                     result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
                 }
@@ -223,7 +221,7 @@ enum class AdminController(val value:String): WebSocketController {
             if (request["limit"].toString().trim().count()==0) {
                 Logger.log(LogLevel.WARNING,"Limit is empty. Limit should be positive value. Username: " +
                         "$username,Remote IP: $sessionIP, Request: $request",
-                        "AdminController","admin_get_users_list.exec")
+                        "AdminController","prepareListQuery")
                 limitFailure = true
                 result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
             } else {
@@ -232,7 +230,7 @@ enum class AdminController(val value:String): WebSocketController {
                 } catch (e:Exception) {
                     Logger.log(LogLevel.WARNING,"Incorrect limit. Limit should be positive value. Username: " +
                             "$username,Remote IP: $sessionIP, Request: $request",
-                            "AdminController","admin_get_users_list.exec")
+                            "AdminController","prepareListQuery")
                     limitFailure = true
                     result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
                 }
@@ -240,7 +238,7 @@ enum class AdminController(val value:String): WebSocketController {
             if (limit <= 0) {
                 Logger.log(LogLevel.WARNING,"Incorrect limit. Limit should be positive value. Username: " +
                         "$username,Remote IP: $sessionIP, Request: $request",
-                        "AdminController","admin_get_users_list.exec")
+                        "AdminController","prepareListQuery")
                 result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
             }
             if (limitFailure) {
@@ -259,29 +257,29 @@ enum class AdminController(val value:String): WebSocketController {
                 failedSort = true
                 Logger.log(LogLevel.WARNING,"Empty sort field. Username: " +
                         "$username,Remote IP: $sessionIP, Request: $request",
-                        "AdminController","admin_get_users_list.exec")
+                        "AdminController","prepareListQuery")
             } else {
                 try {
                     sort = parser.parse(request["sort"].toString()) as JSONObject
                 } catch (e:Exception) {
                     Logger.log(LogLevel.WARNING, "Could not parse 'sort' field of request to JSON." +
                             "Username: $username,Remote IP: $sessionIP, Request: $request",
-                            "AdminController","admin_get_users_list.exec")
+                            "AdminController","prepareListQuery")
                     failedSort = true
                     result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
                 }
                 if (sort.count()==0) {
                     Logger.log(LogLevel.WARNING,"Incorrect sort field. Username: " +
                             "$username,Remote IP: $sessionIP, Request: $request",
-                            "AdminController","admin_get_users_list.exec")
+                            "AdminController","prepareListQuery")
                     failedSort = true
                 } else {
                     for ((index,value) in sort) {
                         if (value.toString() != "ASC" && value.toString()!="DESC") {
                             failedSort = true;
-                            result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
-                        } else if (!ChatApplication.users.schema.containsKey(index.toString())) {
-                            failedSort = true;
+                            Logger.log(LogLevel.WARNING,"Incorrect sort field direction - ${value.toString()}. " +
+                                    "Should be ASC or DESC. Username: $username,Remote IP: $sessionIP, Request: " +
+                                    "$request","AdminController","prepareListQuery")
                             result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
                         } else {
                             sortPair = index.toString() to value.toString()
@@ -320,7 +318,7 @@ enum class AdminController(val value:String): WebSocketController {
 }
 
 /**
- * Definitions onf result codes for Admin controller operations, which returned to client
+ * Definitions of result codes for Admin controller operations, which returned to client
  * with request results
  */
 enum class AdminControllerRequestResults(value:String) {

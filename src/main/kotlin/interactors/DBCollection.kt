@@ -6,6 +6,7 @@ package interactors
 import com.mongodb.client.FindIterable
 import com.mongodb.client.MongoCursor
 import com.mongodb.client.MongoDatabase
+import com.mongodb.util.JSON
 import core.ChatApplication
 import kotlinx.coroutines.experimental.launch
 import models.DBModel
@@ -112,18 +113,23 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
 
     /**
      * Returns list of all models in collection
-     * @param fields: Fields to use for filtering. If no fields specified, all fields used for filtering
-     * @param filter: string, applied to fields. Returned only records, in which any field begins with "filter"
-     * @param offset: starting record (for pagination). If not specified then starts from begining
-     * @param limit: number of records to return . If not specified, all records returned
-     * @param sort: field used for sorting. It is a pair of "field" to (DESC or ASC).
-     * If not specified, natural sorting used, as loaded from database
+     * @param params: Optional params, used to filter and format resulting list. Can include:
+     *          fields: Fields to use for filtering. If no fields specified, all fields used for filtering
+     *          filter: string, applied to fields. Returned only records, in which any field begins with "filter"
+     *          offset: starting record (for pagination). If not specified then starts from begining
+     *          limit: number of records to return . If not specified, all records returned
+     *          sort: field used for sorting. It is a pair of "field" to (DESC or ASC).
+     *          If not specified, natural sorting used, as loaded from database
      * @return ArrayList with all models, which meet criteria
     */
-    fun getList(filter:String="",fields:ArrayList<String>?=null,limit:Int=0,offset:Int=0,
-                sort:Pair<String,String>?=null):ArrayList<Any> {
+    fun getList(params:JSONObject):ArrayList<Any> {
+        val filter = params["filter"]?.toString() ?: ""
+        val fields = params["fields"] as? ArrayList<String>
+        val limit = params["limit"]?.toString()?.toInt() ?: 0
+        val offset = params["offset"]?.toString()?.toInt() ?: 0
+        val sort = params["sort"] as? Pair<String,String>
         var results = ArrayList<Any>()
-        if (filter.count()>0) {
+        if (!filter.isEmpty()) {
             this.models.map { it as DBModel }.forEach {
                 for ((field,_) in schema) {
                     if (it[field] != null && (fields==null || fields.contains(field))) {
@@ -227,18 +233,19 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
 
     /**
      * Returns list of all models in collection as JSONArray
-     * @param fields: Fields to use for filtering. If no fields specified, all fields used for filtering
-     * @param filter: string, applied to fields. Returned only records, in which any field begins with "filter"
-     * @param offset: starting record (for pagination). If not specified then starts from begining
-     * @param limit: number of records to return . If not specified, all records returned
-     * @param sort: field used for sorting. It is a pair of "field" to (DESC or ASC).
-     * If not specified, natural sorting used, as loaded from database
+     * @param params: Optional params, used to filter and format resulting list. Can include:
+     *          fields: Fields to use for filtering. If no fields specified, all fields used for filtering
+     *          filter: string, applied to fields. Returned only records, in which any field begins with "filter"
+     *          offset: starting record (for pagination). If not specified then starts from begining
+     *          limit: number of records to return . If not specified, all records returned
+     *          sort: field used for sorting. It is a pair of "field" to (DESC or ASC).
+     *          If not specified, natural sorting used, as loaded from database
      * @return JSONArray with all models, which meet criteria
      */
-    fun getListJSON(filter:String="",fields:ArrayList<String>?=null,limit:Int=0,offset:Int=0,
-                sort:Pair<String,String>?=null):JSONArray {
+    fun getListJSON(params:JSONObject):JSONArray {
         val results = JSONArray()
-        val models = this.getList(filter,fields,limit,offset,sort)
+        val models = this.getList(params)
+        val fields = params["fields"] as? ArrayList<String>
         for (modelObj in models) {
             val jsonObj = JSONObject()
             val model = modelObj as DBModel
