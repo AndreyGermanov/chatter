@@ -4,11 +4,10 @@ import com.mongodb.client.MongoDatabase
 import com.mongodb.client.model.UpdateOptions
 import core.ChatApplication
 import interactors.DBCollection
-import kotlinx.coroutines.experimental.launch
 import org.bson.Document
 import org.bson.types.ObjectId
 import org.json.simple.JSONObject
-import org.omg.CORBA.Object
+import org.json.simple.parser.JSONParser
 
 /**
  * Base wrapper class for database Model, stored in MongoDB database
@@ -151,5 +150,14 @@ open class DBModel(db:MongoDatabase,colName:String) {
      */
     override fun toString() : String {
         return doc.toString()
+    }
+
+    /**
+     * Returns content of user fields as JSON Object
+     * @return JSON object with all model fields
+     */
+    fun toJSON(): JSONObject {
+        val parser = JSONParser()
+        return parser.parse(this.toString()) as JSONObject
     }
 }

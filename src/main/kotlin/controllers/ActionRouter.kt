@@ -27,17 +27,16 @@ object ActionRouter {
      * @return JSONObject with response to request
      */
     fun processAction(request: JSONObject, session: Session?):JSONObject {
+        val sessionIP = session?.remote?.inetSocketAddress?.address?.toString() ?: ""
         Logger.log(LogLevel.DEBUG,"Begin routing request to Controller action. " +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
-                "Request: $request", "ActionRouter","processAction")
+                "Remote IP: $sessionIP, Request: $request", "ActionRouter","processAction")
         val system_error_response = JSONObject()
         system_error_response.set("status","error")
         system_error_response.set("status_code", MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR)
         system_error_response.set("message", MessageCenter.MessageObjectResponseCodes.INTERNAL_ERROR.getMessage())
         if (!request.containsKey("request_id") || request.get("request_id").toString().isEmpty()) {
             Logger.log(LogLevel.WARNING,"Received request with incorrect request_id. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
-                    "Request : $request", "ActionRouter","processAction")
+                    "Remote IP: $sessionIP, Request : $request", "ActionRouter","processAction")
             return system_error_response
         }
         var actionName = request["action"].toString()
@@ -47,21 +46,18 @@ object ActionRouter {
         }
         if (action == null) {
             Logger.log(LogLevel.WARNING,"Could not find controller and handler for provided action '$action'. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
-                    "Request: $request", "ActionRouter","processAction")
+                    "Remote IP: $sessionIP, Request: $request", "ActionRouter","processAction")
             return system_error_response
         }
         Logger.log(LogLevel.DEBUG,"Routing request to appropriate action of controller." +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
-                "Request : $request", "ActionRouter","processAction")
+                "Remote IP: $sessionIP, Request : $request", "ActionRouter","processAction")
         var auth_response = action.auth(request,session)
         if (auth_response!=null) {
-            Logger.log(LogLevel.DEBUG, "Request did not pass authentification on controller." +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}," +
-                    "Request : $request", "ActionRouter", "processAction")
+            Logger.log(LogLevel.DEBUG, "Request did not pass authentication on controller." +
+                    "Remote IP: $sessionIP, Request : $request", "ActionRouter", "processAction")
             return auth_response
         }
-        var request = action.before(request);
+        var request = action.before(request,session);
         return action.after(request,action.exec(request,session),session)
     }
 }

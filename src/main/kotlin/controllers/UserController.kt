@@ -53,22 +53,16 @@ enum class UserController(val value:String): WebSocketController {
             var status_code = Users.UserUpdateResultCode.RESULT_OK
             var message = ""
             var field = ""
-            var username= request["username"].toString()
             Logger.log(LogLevel.DEBUG,"Begin processing update_user request. " +
-                    "Username: $username," +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                    "Request body: $request", "MessageCenter","updateUser")
+                    "Username: $username, Remote IP: $sessionIP, Request body: $request",
+                    "UserController","update_user.exec")
             MessageCenter.app.users.updateUser(request) { result_code, msg ->
                 Logger.log(LogLevel.DEBUG,"Receive response from Users interactor: $result_code,'$msg' " +
-                        "Username: $username," +
-                        "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                        "MessageCenter","updateUser")
+                        "Username: $username,Remote IP: $sessionIP.","UserController","update_user.exec")
                 status_code = result_code
                 if (status_code != Users.UserUpdateResultCode.RESULT_OK) {
                     Logger.log(LogLevel.DEBUG,"Received error response from Users interactor: $result_code, '$msg' " +
-                            "Username: $username," +
-                            "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                            "MessageCenter","updateUser")
+                            "Username: $username, Remote IP: $sessionIP.","UserController","update_user.exec")
                     if (status_code == Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY ||
                             status_code == Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE) {
                         field = msg
@@ -81,9 +75,7 @@ enum class UserController(val value:String): WebSocketController {
                             request.get("profile_image_checksum").toString().isEmpty()) {
                         Logger.log(LogLevel.WARNING,"Received error response from Users interactor " +
                                 "(empty profile_image_checksum)," +
-                                "Username: $username," +
-                                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                                "MessageCenter","updateUser")
+                                "Username: $username, Remote IP: $sessionIP","UserController","update_user.exec")
                         status_code = Users.UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY
                         field = "profile_image_checksum"
                         message = "Error with profile image. Please, try again"
@@ -95,10 +87,8 @@ enum class UserController(val value:String): WebSocketController {
                                 checksum = request.get("profile_image_checksum").toString().toLong()
                             } catch (e: Exception) {
                                 Logger.log(LogLevel.DEBUG,"Received successful error response from Users interactor " +
-                                        "(incorrect profile_image_checksum) " +
-                                        "Username: $username," +
-                                        "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                                        "MessageCenter","updateUser")
+                                        "(incorrect profile_image_checksum). Username: $username, " +
+                                        "Remote IP: $sessionIP","UserController","update_user.exec")
                                 status = "error"
                                 field = "profile_image_checksum"
                                 status_code = Users.UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE
@@ -116,9 +106,8 @@ enum class UserController(val value:String): WebSocketController {
                             pending_request.set("request",request)
                             MessageCenter.file_requests.set(checksum, pending_request)
                             Logger.log(LogLevel.DEBUG,"Add record to 'file_requests' queue for checksum: $checksum. " +
-                                    "Username: $username," +
-                                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                                    "Request body: ${JSONObject(pending_request)}")
+                                    "Username: $username, Remote IP: $sessionIP, " +
+                                    "Request body: ${JSONObject(pending_request)}","UserController","update_user.exec")
                             status_code = Users.UserUpdateResultCode.RESULT_OK_PENDING_IMAGE_UPLOAD
                         } else {
                             message = status_code.getMessage()
@@ -135,13 +124,14 @@ enum class UserController(val value:String): WebSocketController {
                 result.set("field", field)
             }
             Logger.log(LogLevel.DEBUG,"Return result of update_user request. " +
-                    "Username: $username," +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                    "Request body: $request. Result body: $result",
-                    "MessageCenter","updateUser")
+                    "Username: $username, Remote IP: $sessionIP, Request body: $request. Result body: $result",
+                    "UserController","update_user.exec")
             return result
         }
     };
+    override var user: models.User? = null
+    override var username: String = ""
+    override var sessionIP = ""
     /**
      * Function, which must be executed before any action to check, if request has
      * enough authentication information to use actions of this controller
@@ -154,9 +144,10 @@ enum class UserController(val value:String): WebSocketController {
      *         message - string representation of error
      */
      override open fun auth(request:JSONObject,session:Session?):JSONObject? {
-        var response = JSONObject()
+        val response = JSONObject()
+        val sessionIP = session?.remote?.inetSocketAddress?.address?.toString() ?: ""
         Logger.log(LogLevel.DEBUG,"Authentication on enter UserController started." +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}","UserController","auth")
+                "Remote IP: $sessionIP.","UserController","auth")
         if (!request.containsKey("user_id") || MessageCenter.app.users.getById(request.get("user_id").toString()) == null) {
             response.set("status","error")
             response.set("status_code", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR)
@@ -177,7 +168,7 @@ enum class UserController(val value:String): WebSocketController {
             return response
         }
         Logger.log(LogLevel.DEBUG,"Authentication on enter UserController passed successfully." +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}","UserController","auth")
+                "Remote IP: $sessionIP.","UserController","auth")
         return null
     }
 
@@ -190,13 +181,16 @@ enum class UserController(val value:String): WebSocketController {
      * @return Modified request
      */
     override open fun before(request:JSONObject,session:Session?):JSONObject {
+        val request = super.before(request, session)
         Logger.log(LogLevel.DEBUG,"Starting 'before' handler." +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}.","UserController","before")
+                "Remote IP: $sessionIP.","UserController","before")
         val user = ChatApplication.users.getById(request["user_id"]!!.toString())!! as User
         request["username"] = user["login"].toString()
         request["user"] = user
-        Logger.log(LogLevel.DEBUG,"Finish 'before' handler.Username: ${request["username"].toString()}," +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}.","UserController","before")
+        this.username = request["username"].toString()
+        this.user = user
+        Logger.log(LogLevel.DEBUG,"Finish 'before' handler.Username: $username, Remote IP: $sessionIP.",
+                "UserController","before")
         return request
     }
     companion object {

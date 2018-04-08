@@ -359,7 +359,7 @@ class MessageCenterTest {
                 "user_id" to "12345",
                 "session_id" to "12345"))
         session.remote.sendString(request.toString())
-        Thread.sleep(100)
+        Thread.sleep(500)
         var response = parser.parse(this.webSocketResponse) as JSONObject
         this.webSocketResponse = ""
         assertEquals("Should return error, if incorrect user_id provided", "error", response["status"].toString())
@@ -391,7 +391,7 @@ class MessageCenterTest {
                     "session_id" to session_id
             ))
             session.remote.sendString(request.toString())
-            Thread.sleep(200)
+            Thread.sleep(500)
             response = parser.parse(this.webSocketResponse) as JSONObject
             this.webSocketResponse = ""
             assertEquals("Should return ok, if correct user_id and session_id provided", "ok", response["status"].toString())

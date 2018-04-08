@@ -152,14 +152,14 @@ object MessageCenter {
      * @param session: Link to client session
      */
     fun onWebSocketText(message: String?,session:Session? = null) {
+        val sessionIP = session?.remote?.inetSocketAddress?.address?.toString() ?: ""
         Logger.log(LogLevel.DEBUG,"Received text request to WebSocket server. " +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}" +
-                "Response string: $message", "MessageCenter","onWebSocketText")
+                "Remote IP: $sessionIP, Request string: $message", "MessageCenter","onWebSocketText")
         val system_error_response = JSONObject()
         system_error_response.set("status","error")
         system_error_response.set("status_code",MessageObjectResponseCodes.INTERNAL_ERROR)
         system_error_response.set("message",MessageObjectResponseCodes.INTERNAL_ERROR.getMessage())
-        var response = JSONObject()
+        var response:JSONObject
         if (message != null) {
             val parser = JSONParser()
             var obj = JSONObject()
@@ -167,20 +167,17 @@ object MessageCenter {
                 obj = parser.parse(message) as JSONObject
             } catch (e:Exception) {
                 Logger.log(LogLevel.WARNING,"Error while parse request to JSON. " +
-                        "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}" +
-                        "Request string: $message", "MessageCenter","onWebSocketText")
+                        "Remote IP: $sessionIP, Request string: $message", "MessageCenter","onWebSocketText")
                 response = system_error_response
             }
             if (!obj.containsKey("action") || obj["action"].toString().isEmpty()) {
                 Logger.log(LogLevel.WARNING,"Received request without action. " +
-                        "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}" +
-                        "Request : $obj", "MessageCenter","onWebSocketText")
+                        "Remote IP: $sessionIP, Request : $obj", "MessageCenter","onWebSocketText")
                 response = system_error_response
             } else {
                 response = ActionRouter.processAction(obj,session)
-                Logger.log(LogLevel.DEBUG,"Received response from ActionRouter " +
-                        "Request : $obj, action : ${obj["action"]}, response: $response",
-                        "MessageCenter","onWebSocketText")
+                Logger.log(LogLevel.DEBUG,"Received response from ActionRouter. Remote IP: $sessionIP,Request : $obj, " +
+                        "action : ${obj["action"]}, response: $response", "MessageCenter","onWebSocketText")
                 system_error_response["action"] = obj["action"].toString()
             }
             if (obj.containsKey("request_id")) {
@@ -188,9 +185,7 @@ object MessageCenter {
             }
         } else {
             Logger.log(LogLevel.WARNING,"Received empty request without body. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName}" +
-                    "Response string: $message",
-                    "MessageCenter","onWebSocketText")
+                    "Remote IP: $sessionIP, Response string: $message", "MessageCenter","onWebSocketText")
             response = system_error_response
         }
         var file:ByteArray? = null
@@ -201,20 +196,20 @@ object MessageCenter {
         lastResponse = toJSONString(response)
         if (session?.remote!=null) {
             session?.remote!!.sendString(lastResponse)
-            Logger.log(LogLevel.DEBUG,"Sent response to client ${session?.remote?.inetSocketAddress?.hostName}. " +
-                    "Response body: $lastResponse", "MessageCenter","onWebSocketText")
-        } else {
-            Logger.log(LogLevel.WARNING,"Could not send text response to request: $message. No remote session instance",
+            Logger.log(LogLevel.DEBUG,"Sent response to client $sessionIP. Response body: $lastResponse",
                     "MessageCenter","onWebSocketText")
+        } else {
+            Logger.log(LogLevel.WARNING,"Could not send text response to request: $message. " +
+                    "No remote session instance", "MessageCenter","onWebSocketText")
         }
         if (file != null) {
             if (session?.remote!=null) {
                 session?.remote!!.sendBytes(ByteBuffer.wrap(file))
-                Logger.log(LogLevel.DEBUG,"Sent file to client ${session?.remote?.inetSocketAddress?.hostName}",
+                Logger.log(LogLevel.DEBUG,"Sent file to client $sessionIP.",
                         "MessageCenter","onWebSocketText")
             } else {
-                Logger.log(LogLevel.WARNING,"Could not send file response to request: $message. No remote session instance",
-                        "MessageCenter","onWebSocketText")
+                Logger.log(LogLevel.WARNING,"Could not send file response to request: $message. " +
+                        "No remote session instance", "MessageCenter","onWebSocketText")
             }
         }
     }
@@ -226,16 +221,15 @@ object MessageCenter {
      * @param session Link to client session
      */
     fun onWebSocketBinary(payload: ByteArray?, offset: Int, len: Int,session:Session?=null) {
+        var sessionIP = session?.remote?.inetSocketAddress?.address?.toString() ?: ""
         Logger.log(LogLevel.DEBUG,"Received binary request to WebSocket server. " +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                "MessageCenter","onWebSocketBinary")
+                "Remote IP: $sessionIP", "MessageCenter","onWebSocketBinary")
         if (payload != null) {
             var checkSumEngine = CRC32()
             checkSumEngine.update(payload)
             val checksum = checkSumEngine.value
             Logger.log(LogLevel.DEBUG,"Received binary request with checksum $checksum to WebSocket server. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                    "MessageCenter","onWebSocketBinary")
+                    "Remote IP: $sessionIP.","MessageCenter","onWebSocketBinary")
             if (this.file_requests.containsKey(checksum)) {
                 var pending_request = this.file_requests.get(checksum) as HashMap<String,Any>
                 var request = pending_request.get("request") as JSONObject
@@ -256,29 +250,22 @@ object MessageCenter {
                 lastResponse = toJSONString(response)
                 this.file_requests.remove(checksum)
                 Logger.log(LogLevel.DEBUG,"Prepared response to send back to client. " +
-                        "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}." +
-                        "Response body: $lastResponse",
-                        "MessageCenter","onWebSocketBinary")
+                        "Remote IP: $sessionIP, Response body: $lastResponse","MessageCenter","onWebSocketBinary")
                 if (queue_session!=null) {
                     queue_session.remote.sendString(lastResponse)
                     Logger.log(LogLevel.DEBUG,"Sent response to client. " +
-                            "Remote IP: ${queue_session?.remote?.inetSocketAddress?.hostName ?: ""}." +
-                            "Response body: $lastResponse", "MessageCenter","onWebSocketBinary")
+                            "Remote IP: $sessionIP. Response body: $lastResponse", "MessageCenter","onWebSocketBinary")
                 } else {
                     Logger.log(LogLevel.WARNING,"Could not send response to client. Remote session not exist " +
-                            "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}." +
-                            "Response body: $lastResponse","MessageCenter","onWebSocketBinary")
+                            "Remote IP: $sessionIP. Response body: $lastResponse","MessageCenter","onWebSocketBinary")
                 }
             } else {
                 Logger.log(LogLevel.WARNING,"Received binary request with checksum $checksum not found . " +
-                        "in 'file_requests' queue " +
-                        "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                        "MessageCenter","onWebSocketBinary")
+                        "in 'file_requests' queue. Remote IP: $sessionIP","MessageCenter","onWebSocketBinary")
             }
         } else {
             Logger.log(LogLevel.WARNING,"Received empty binary request to WebSocket server. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                    "MessageCenter","onWebSocketBinary")
+                    "Remote IP: $sessionIP.","MessageCenter","onWebSocketBinary")
         }
     }
 
@@ -289,7 +276,8 @@ object MessageCenter {
     fun onWebSocketConnect(session: Session?) {
         if (session != null) {
             Logger.log(LogLevel.DEBUG,"Received connection handshake request from client. " +
-                    "Host: ${session.remote.inetSocketAddress.hostName}", "MessageCenter","onWebSocketClientConnect")
+                    "Host: ${session.remote.inetSocketAddress.address?.toString()}",
+                    "MessageCenter","onWebSocketClientConnect")
             session.policy.maxBinaryMessageSize = 99999999
         }
     }
@@ -301,7 +289,7 @@ object MessageCenter {
      */
     fun onWebSocketClose(statusCode: Int, reason: String?,session:Session?=null) {
         Logger.log(LogLevel.DEBUG,"Received disconnection request from client. " +
-                "Host: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
+                "Host: ${session?.remote?.inetSocketAddress?.address?.toString()}",
                 "MessageCenter","onWebSocketClientDisconnect")
         if (reason != null) {
         }
@@ -314,7 +302,7 @@ object MessageCenter {
      */
     fun onWebSocketError(cause: Throwable,session:Session?=null) {
         Logger.log(LogLevel.WARNING,"Error in WebSocketOperation. Cause:${cause.message}." +
-                "Host: ${session?.remote?.inetSocketAddress?.hostName}",
+                "Host: ${session?.remote?.inetSocketAddress?.address?.toString()}",
                 "MessageCenter","onWebSocketError")
     }
 

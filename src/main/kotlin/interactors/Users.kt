@@ -11,6 +11,8 @@ import models.Session
 import org.bson.types.ObjectId
 import org.json.simple.JSONObject
 import utils.BCrypt
+import utils.LogLevel
+import utils.Logger
 import utils.SendMail
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -60,6 +62,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
      * @return calls callback with registration result code and registered user model, if result code is RESULT_OK
      */
     fun register(params: JSONObject, callback:(result_code:UserRegisterResultCode,user:User?) -> Unit) {
+        Logger.log(LogLevel.DEBUG,"Begin register user. Params: $params.","Users","register")
         if (!params.contains("login")) {
             callback(UserRegisterResultCode.RESULT_ERROR_NO_LOGIN,null)
         } else if (params.get("login").toString().isEmpty()) {
@@ -73,12 +76,16 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         } else if (params.get("password").toString().isEmpty()) {
             callback(UserRegisterResultCode.RESULT_ERROR_NO_PASSWORD,null)
         } else {
+            Logger.log(LogLevel.DEBUG,"Continue register user after simple empty fields validation. " +
+                    "Params: $params.","Users","register")
             val col = db.getCollection(collectionName)
             if (col.find(Document("login",params.get("login").toString())).count()>0) {
                 callback(UserRegisterResultCode.RESULT_ERROR_LOGIN_EXISTS,null)
             } else if (col.find(Document("email",params.get("email").toString())).count()>0) {
                 callback(UserRegisterResultCode.RESULT_ERROR_EMAIL_EXISTS,null)
             } else {
+                Logger.log(LogLevel.DEBUG,"Continue register user after 'user exists' validation. " +
+                        "Params: $params.","Users","register")
                 val user = User(db,collectionName)
                 user["_id"] = ObjectId.get()
                 user["login"] = params.get("login").toString()
@@ -86,15 +93,25 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 user["password"] = BCrypt.hashpw(params.get("password").toString(),BCrypt.gensalt(SALT_ROUNDS))
                 user["active"] = false
                 user["role"] = 1
+                Logger.log(LogLevel.DEBUG,"Prepared record to save registered user. " +
+                        "Params: $user.","Users","register")
                 user.save {
+                    Logger.log(LogLevel.DEBUG,"Saved registered user. About to send activation email " +
+                            "Params: $user.","Users","register")
                     app.smtpClient.init(user["email"].toString(),"Chatter Account Activation")
                     val result = app.smtpClient.sendMessage("Please, follow this link to activate your Chatter account "+
                             app.host+":"+app.port.toString()+"/activate/"+user["_id"])
                     addModel(user)
                     if (result) {
+                        Logger.log(LogLevel.DEBUG,"Success sending registered user activation email. Return success result" +
+                                "Params: $user.","Users","register")
                         callback(UserRegisterResultCode.RESULT_OK, user)
                     } else {
+                        Logger.log(LogLevel.WARNING,"Could not send activation email." +
+                                "Params: $user.","Users","register")
                         this.remove(user["_id"].toString()) {
+                            Logger.log(LogLevel.WARNING,"Removed user with _id=${user["_id"]} because could not send" +
+                                    "activation email","Users","register")
                             callback(UserRegisterResultCode.RESULT_ERROR_ACTIVATION_EMAIL, user)
                         }
                     }

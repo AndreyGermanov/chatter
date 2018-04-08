@@ -14,6 +14,8 @@ import org.bson.Document
 import org.bson.types.ObjectId
 import org.json.simple.JSONArray
 import org.json.simple.JSONObject
+import utils.LogLevel
+import utils.Logger
 
 /**
  *   Base class of collection of database models of type [T] based on DBModel
@@ -35,7 +37,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     var currentItem = 0
     var app = ChatApplication
 
-    open var schema = hashMapOf("_id" to "String") as HashMap<String,String>
+    open var schema = hashMapOf("_id" to "String")
 
     init {
         collectionName = colName
@@ -110,10 +112,148 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
 
     /**
      * Returns list of all models in collection
-     * @return ArrayList with all models
+     * @param fields: Fields to use for filtering. If no fields specified, all fields used for filtering
+     * @param filter: string, applied to fields. Returned only records, in which any field begins with "filter"
+     * @param offset: starting record (for pagination). If not specified then starts from begining
+     * @param limit: number of records to return . If not specified, all records returned
+     * @param sort: field used for sorting. It is a pair of "field" to (DESC or ASC).
+     * If not specified, natural sorting used, as loaded from database
+     * @return ArrayList with all models, which meet criteria
     */
-    fun getList():ArrayList<Any> {
-        return this.models
+    fun getList(filter:String="",fields:ArrayList<String>?=null,limit:Int=0,offset:Int=0,
+                sort:Pair<String,String>?=null):ArrayList<Any> {
+        var results = ArrayList<Any>()
+        if (filter.count()>0) {
+            this.models.map { it as DBModel }.forEach {
+                for ((field,_) in schema) {
+                    if (it[field] != null && (fields==null || fields.contains(field))) {
+                        if (it[field].toString().toLowerCase().startsWith(filter,true)) {
+                            results.add(it)
+                        }
+                    }
+                }
+            }
+        } else {
+            results = this.models
+        }
+        if (sort!=null && schema[sort.first]!=null) {
+            var sortField = sort.first
+            var sortType = schema[sort.first].toString()
+            var corrector = 1
+            if (sort.second == "DESC") {
+                corrector = -1
+            }
+            results.sortWith(Comparator<Any> { p1, p2 ->
+                val p1 = p1 as DBModel
+                val p2 = p2 as DBModel
+                when (sortType) {
+                    "Double" -> {
+                        var v1 = 0.0
+                        var v2 = 0.0
+                        try {
+                            v1 = p1[sortField]?.toString()?.toDouble() ?: 0.0
+                            v2 = p2[sortField]?.toString()?.toDouble() ?: 0.0
+                        } catch (e:Exception) {
+                            Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Double " +
+                                    "for sorting: ${p1[sortField]},${p2[sortField]}","DBCollection","getList")
+                        }
+                        if (v1>v2) {
+                            1*corrector
+                        } else if (v1<v2) {
+                            -1*corrector
+                        } else {
+                            0
+                        }
+                    }
+                    "Int" -> {
+                        var v1 = 0
+                        var v2 = 0
+                        try {
+                            v1 = p1[sortField]?.toString()?.toInt() ?: 0
+                            v2 = p2[sortField]?.toString()?.toInt() ?: 0
+                        } catch (e:Exception) {
+                            Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Int " +
+                                    "for sorting: ${p1[sortField]},${p2[sortField]}","DBCollection","getList")
+                        }
+                        if (v1>v2) {
+                            1*corrector
+                        } else if (v1<v2) {
+                            -1*corrector
+                        } else {
+                            0
+                        }
+                    }
+                    "Boolean" -> {
+                        var v1 = false
+                        var v2 = false
+                        try {
+                            v1 = p1[sortField].toString()?.toBoolean() ?: false
+                            v2 = p2[sortField].toString()?.toBoolean() ?: false
+                        } catch (e:Exception) {
+                            Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Boolean " +
+                                    "for sorting: ${p1[sortField]},${p2[sortField]}","DBCollection","getList")
+                        }
+                        if (v1>v2) {
+                            1*corrector
+                        } else if (v1<v2) {
+                            -1*corrector
+                        } else {
+                            0
+                        }
+                    }
+                    else -> {
+                        var v1 = p1[sortField]?.toString() ?: ""
+                        var v2 = p2[sortField]?.toString() ?: ""
+                        if (v1>v2) {
+                            1*corrector
+                        } else if (v1<v2) {
+                            -1*corrector
+                        } else {
+                            0
+                        }
+                    }
+                }
+            })
+        }
+        if (offset>0 || limit>0) {
+            var endIndex = limit
+            if (endIndex == 0) {
+                endIndex = results.size
+            }
+            results = results.subList(offset,endIndex) as ArrayList<Any>
+        }
+        return results
+    }
+
+    /**
+     * Returns list of all models in collection as JSONArray
+     * @param fields: Fields to use for filtering. If no fields specified, all fields used for filtering
+     * @param filter: string, applied to fields. Returned only records, in which any field begins with "filter"
+     * @param offset: starting record (for pagination). If not specified then starts from begining
+     * @param limit: number of records to return . If not specified, all records returned
+     * @param sort: field used for sorting. It is a pair of "field" to (DESC or ASC).
+     * If not specified, natural sorting used, as loaded from database
+     * @return JSONArray with all models, which meet criteria
+     */
+    fun getListJSON(filter:String="",fields:ArrayList<String>?=null,limit:Int=0,offset:Int=0,
+                sort:Pair<String,String>?=null):JSONArray {
+        val results = JSONArray()
+        val models = this.getList(filter,fields,limit,offset,sort)
+        for (modelObj in models) {
+            val jsonObj = JSONObject()
+            val model = modelObj as DBModel
+            for ((field_index,_) in schema) {
+                if (model[field_index]!=null && (fields==null || fields.contains(field_index))) {
+                    jsonObj[field_index] = model[field_index]
+                }
+            }
+            if (jsonObj.count()>0) {
+                Logger.log(LogLevel.DEBUG,"Empty JSON for model $model, using fields: $fields","DBCollection",
+                        "getListJSON")
+                results.add(jsonObj)
+            }
+        }
+        return results
     }
 
     /**

@@ -5,12 +5,21 @@ package controllers
 
 import org.eclipse.jetty.websocket.api.Session
 import org.json.simple.JSONObject
+import utils.LogLevel
+import utils.Logger
 
 /**
  * Interface which should implement each Controller, that processes
  * client requests of WebSocket server
  */
 interface WebSocketController {
+    /// Object of authenticated user or null, if request came from guest
+    var user:models.User?
+    /// name of authenticated user or black
+    var username:String
+    /// IP address of remote session or blank
+    var sessionIP:String
+
     /**
      * Action execution method. Each action should have this method
      * @param request Incoming request
@@ -45,6 +54,15 @@ interface WebSocketController {
      * @return Modified request
      */
     open fun before(request:JSONObject,session:Session?=null):JSONObject {
+        Logger.log(LogLevel.DEBUG,"Started root 'before' middleware for request $request","WebSocketController","before")
+        this.sessionIP = session?.remote?.inetSocketAddress?.address.toString() ?: ""
+        if (this.sessionIP.count()>0) {
+            Logger.log(LogLevel.DEBUG,"Determined client session IP address: '$sessionIP' for request $request",
+                    "WebSocketController","before")
+        } else {
+            Logger.log(LogLevel.WARNING,"Could not determine client IP address for request $request",
+                    "WebSocketController","before")
+        }
         return request
     }
 

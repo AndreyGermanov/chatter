@@ -17,7 +17,6 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.zip.CRC32
 
-
 /**
  * Controller which represents set of actions, related to user login and registration
  */
@@ -45,19 +44,17 @@ enum class LoginController(val value:String): WebSocketController {
          */
         override fun exec(request:JSONObject,session: Session?):JSONObject {
             Logger.log(LogLevel.DEBUG,"Begin processing register_user request. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                    "Request body: $request", "MessageCenter","registerUser");
+                    "Remote IP: $sessionIP.Request body: $request", "LoginController","register_user.exec")
             var response = JSONObject()
             var status = "error"
             var message = ""
             MessageCenter.app.users.register(request) { result, user ->
                 Logger.log(LogLevel.DEBUG,"Register user request sent to database. " +
-                        "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                        "Result: $result. Registered record: $user", "MessageCenter","registerUser")
+                        "Remote IP: $sessionIP" + "Result: $result. Registered record: $user",
+                        "LoginController","register_user.exec")
                 if (result is Users.UserRegisterResultCode) {
-                    Logger.log(LogLevel.DEBUG,"Register user response from DB has correct format: $result " +
-                            "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                            "MessageCenter","registerUser")
+                    Logger.log(LogLevel.DEBUG,"Register user response from DB has correct format: $result" +
+                            "Remote IP: $sessionIP.","LoginController","register_user.exec")
                     response.set("status_code", result.toString())
                     if (result == Users.UserRegisterResultCode.RESULT_OK) {
                         status = "ok"
@@ -65,8 +62,7 @@ enum class LoginController(val value:String): WebSocketController {
                     message = result.getMessage()
                 } else {
                     Logger.log(LogLevel.WARNING,"Register user response does not have correct format. " +
-                            "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                            "Response body: $result", "MessageCenter","registerUser")
+                            "Remote IP: $sessionIP},Response body: $result", "LoginController","register_user.exec")
                     response.set("status_code", Users.UserRegisterResultCode.RESULT_ERROR_UNKNOWN)
                     message = "Unknown error. Contact support"
                 }
@@ -74,8 +70,7 @@ enum class LoginController(val value:String): WebSocketController {
             response.set("status",status)
             response.set("message",message)
             Logger.log(LogLevel.DEBUG,"Return result of register user request. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                    "Response body: $response", "MessageCenter","registerUser")
+                    "Remote IP: $sessionIP,Response body: $response", "LoginController","register_user.exec")
             return response
         }
     },
@@ -112,8 +107,7 @@ enum class LoginController(val value:String): WebSocketController {
          */
         override fun exec(request:JSONObject,session: Session?):JSONObject {
             Logger.log(LogLevel.DEBUG,"Begin processing login_user request. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                    "Request body: $request","MessageCenter","loginUser")
+                    "Remote IP: $sessionIP,Request body: $request","LoginController","login_user.exec")
             var response = JSONObject()
             var status = "error"
             var status_code: Users.UserLoginResultCode = Users.UserLoginResultCode.RESULT_OK
@@ -122,21 +116,19 @@ enum class LoginController(val value:String): WebSocketController {
             } else if (!request.contains("password") || request.get("password").toString().isEmpty()) {
                 status_code = Users.UserLoginResultCode.RESULT_ERROR_INCORRECT_PASSWORD
             } else {
-                Logger.log(LogLevel.DEBUG,"Sending login user request to Users interactor","MessageCenter","loginuser")
+                Logger.log(LogLevel.DEBUG,"Sending login user request to Users interactor." +
+                        "Remote IP: $sessionIP.","LoginController","login_user.exec")
                 MessageCenter.app.users.login(request.get("login").toString(), request.get("password").toString()) {
                     result_code, user ->
                     Logger.log(LogLevel.DEBUG,"Received result after processing by Users interactor. " +
-                            "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                            "Result: $result_code", "MessageCenter","loginUser")
+                            "Remote IP: $sessionIP,Result: $result_code", "LoginController","login_user.exec")
                     if (result_code != Users.UserLoginResultCode.RESULT_OK) {
                         Logger.log(LogLevel.DEBUG,"Received error from Users interactor." +
-                                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                                "MessageCenter","loginUser")
+                                "Remote IP: $sessionIP","LoginController","login_user.exec")
                         status_code = result_code
                     } else {
                         Logger.log(LogLevel.DEBUG,"Received success result from Users interactor. " +
-                                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                                "Preparing response","MessageCenter","loginUser")
+                                "Remote IP: $sessionIP. Preparing response","LoginController","login_user.exec")
                         status = "ok"
                         val sessionObj = MessageCenter.app.sessions.getBy("user_id",user!!["_id"].toString())
                         if (sessionObj != null) {
@@ -144,8 +136,7 @@ enum class LoginController(val value:String): WebSocketController {
                             response.set("session_id",session["_id"])
                         } else {
                             Logger.log(LogLevel.WARNING,"Could not get session_id for user which logged" +
-                                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                                    "MessageCenter", "loginUser")
+                                    "Remote IP: $sessionIP.","LoginController", "login_user.exec")
                         }
                         response.set("login",user!!["login"])
                         response.set("email",user!!["email"])
@@ -181,8 +172,7 @@ enum class LoginController(val value:String): WebSocketController {
                         }
                         response.set("rooms",rooms)
                         Logger.log(LogLevel.DEBUG,"Prepared login_user response before process profile image: $response" +
-                                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                                "MessageCenter","loginUser")
+                                "Remote IP: $sessionIP.","LoginController","login_user.exec")
                         if (Files.exists(Paths.get(MessageCenter.app.usersPath+"/"+user["_id"]+"/profile.png"))) {
                             val stream = FileInputStream(MessageCenter.app.usersPath+"/"+user["_id"]+"/profile.png")
                             val img = stream.readBytes()
@@ -191,12 +181,10 @@ enum class LoginController(val value:String): WebSocketController {
                             response.set("checksum",checksumEngine.value.toString())
                             response.set("file",img)
                             Logger.log(LogLevel.DEBUG,"Prepared login_user response with profile image " +
-                                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}." +
-                                    "Response: $response")
+                                    "Remote IP: $sessionIP.Response: $response","LoginController","login_user.exec")
                         } else {
                             Logger.log(LogLevel.DEBUG,"Profile image not found for user. " +
-                                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                                    "User body: $user", "MessageCenter","loginUser")
+                                    "Remote IP: $sessionIP,User body: $user", "LoginController","login_user.exec")
                         }
                     }
                 }
@@ -205,8 +193,8 @@ enum class LoginController(val value:String): WebSocketController {
             response.set("status_code",status_code.toString())
             response.set("message",status_code.getMessage())
             Logger.log(LogLevel.DEBUG,"Return final response for login_user request. " +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}" +
-                    "Request body: $request, Response body: $response", "MessageCenter", "loginUser")
+                    "Remote IP: $sessionIP,Request body: $request, Response body: $response",
+                    "LoginController", "login_user.exec")
             return response
         }
     },
@@ -225,23 +213,32 @@ enum class LoginController(val value:String): WebSocketController {
          *          status - "ok" or "error",status_code="RESULT_OK"
          */
         override fun exec(request: JSONObject, session: Session?): JSONObject {
-            Logger.log(LogLevel.DEBUG,"Begin logout_user action for user '${request["username"]}'." +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                    "LoginController","logout_user")
+            Logger.log(LogLevel.DEBUG,"Begin logout_user action for user '$username'." +
+                    "Remote IP: $sessionIP.","LoginController","logout_user.exec")
             var result = JSONObject()
             ChatApplication.sessions.remove(request["session_id"].toString(), {})
             result["status"] = "ok"
             result["status_code"] = "RESULT_OK"
-            Logger.log(LogLevel.DEBUG,"Finished logout_user action for user '${request["username"]} successfully." +
-                    "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}",
-                    "LoginController","logout_user")
+            Logger.log(LogLevel.DEBUG,"Finished logout_user action for user '$username' successfully." +
+                    "Remote IP: $sessionIP.","LoginController","logout_user.exec")
             return result
         }
         override fun auth(request:JSONObject,session:Session?): JSONObject? {
+            Logger.log(LogLevel.DEBUG,"Begin logout_user.auth() for user '$username'." +
+                    "Remote IP: $sessionIP.", "LoginController","logout_user.auth")
             return UserController.update_user.auth(request,session)
         }
+        override fun before(request:JSONObject,session:Session?): JSONObject {
+            var request = super.before(request, session)
+            request = UserController.update_user.before(request,session)
+            user = request["user"] as models.User
+            username = request["username"].toString()
+            return request
+        }
     };
-
+    override var user: models.User? = null
+    override var username: String = ""
+    override var sessionIP = ""
     /**
      * Function, which must be executed before any action to check, if request has
      * enough authentication information to use actions of this controller
@@ -254,9 +251,9 @@ enum class LoginController(val value:String): WebSocketController {
      */
     override open fun auth(request:JSONObject,session:Session?):JSONObject? {
         Logger.log(LogLevel.DEBUG,"Authentication on enter LoginController." +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}","LoginController","auth")
+                "Remote IP: $sessionIP.","LoginController","auth")
         Logger.log(LogLevel.DEBUG,"Authentication on enter LoginController passed successfully." +
-                "Remote IP: ${session?.remote?.inetSocketAddress?.hostName ?: ""}","LoginController","auth")
+                "Remote IP: $sessionIP.","LoginController","auth")
         return null
     }
     companion object {
