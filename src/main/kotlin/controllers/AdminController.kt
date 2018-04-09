@@ -64,7 +64,83 @@ enum class AdminController(val value:String): WebSocketController {
     },
     admin_get_user("admin_get_user"),
     admin_update_user("admin_update_user"),
-    admin_remove_user("admin_remove_user");
+    admin_remove_users("admin_remove_users") {
+        override fun exec(request:JSONObject, session:Session?): JSONObject {
+            Logger.log(LogLevel.DEBUG, "Begin admin_remove_users action. Username: $username. " +
+                    "Remote IP: $sessionIP. Request: $request.","AdminController","admin_get_users_list.exec")
+            val response = JSONObject()
+            val parser = JSONParser()
+            if (request["list"]==null) {
+                response["status"] = "error"
+                response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
+                response["field"] = "list"
+                Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty." +
+                        "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
+                        "admin_remove_users.exec")
+                return response
+            }
+            var list:JSONArray? = null
+            if (request["list"] is String) {
+                try {
+                    list = parser.parse(request["list"].toString()) as JSONArray
+                } catch (e:Exception) {
+                    response["status"] = "error"
+                    response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
+                    response["field"] = "list"
+                    Logger.log(LogLevel.WARNING,"Could not parse list of users to remove from ${request["list"]}." +
+                            "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
+                            "admin_remove_users.exec")
+                }
+            } else if (request["list"] is JSONArray) {
+                list = request["list"] as JSONArray
+            }
+            if (list==null || list.count()==0) {
+                response["status"] = "error"
+                response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
+                response["field"] = "list"
+                Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty." +
+                        "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
+                        "admin_remove_users.exec")
+                return response
+            }
+            val user_ids = ArrayList<String>()
+            val it = list.iterator()
+            while (it.hasNext()) {
+                val user_id = it.next() as? String
+                if (user_id!=null && user_id != request["user_id"].toString()) {
+                    user_ids.add(user_id)
+                } else if (user_id == request["user_id"].toString()) {
+                    Logger.log(LogLevel.WARNING,"One of user_ids passed to action belongs to originator of request." +
+                            "Sorry, you can not delete yourself. Your ID filtered from list. Username: $username," +
+                            "Remote IP: $sessionIP,Request:$request")
+                }
+            }
+            if (user_ids.count()==0) {
+                response["status"] = "error"
+                response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
+                response["field"] = "list"
+                Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty." +
+                        "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
+                        "admin_remove_users.exec")
+                return response
+            }
+            Logger.log(LogLevel.DEBUG,"Prepared list of users to remove: $user_ids. Removing ...Username: $username," +
+                    "Remote IP: $sessionIP,Request:$request","AdminController","admin_remove_users.exec")
+            val removed_count = ChatApplication.users.removeUsers(user_ids)
+            if (removed_count == 0) {
+                Logger.log(LogLevel.WARNING,"Did not remove any user. Probable ids are incorrect" +
+                        "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
+                        "admin_remove_users.exec")
+            } else {
+                Logger.log(LogLevel.DEBUG,"Successfuly removed $removed_count items. Username: $username," +
+                        "Remote IP: $sessionIP,Request:$request","AdminController","admin_remove_users.exec")
+            }
+            response["status"] = "ok"
+            response["status_code"] = AdminControllerRequestResults.RESULT_OK
+            response["count"] = removed_count
+            return response
+        }
+    };
 
     override var user: models.User? = null
     override var username: String = ""
@@ -89,14 +165,14 @@ enum class AdminController(val value:String): WebSocketController {
                 "Remote IP: $sessionIP", "AdminController", "auth")
         var response: JSONObject? = UserController.update_user.auth(request, session)
         if (response != null) {
-            return response;
+            return response
         }
         response = JSONObject(hashMapOf(
-                "status" to "error",
                 "status_code" to MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR,
+                "status" to "error",
                 "message" to MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage()
         ))
-        var user = MessageCenter.app.users.getById(request.get("user_id").toString()) as models.User
+        val user = MessageCenter.app.users.getById(request.get("user_id").toString()) as models.User
         if (user["role"] == null) {
             return response
         }
@@ -113,8 +189,7 @@ enum class AdminController(val value:String): WebSocketController {
         return null
     }
     override open fun before(request: JSONObject, session: Session?): JSONObject {
-        val request = UserController.update_user.before(request,session)
-        return request
+        return UserController.update_user.before(request,session)
     }
 
     /**
@@ -131,10 +206,10 @@ enum class AdminController(val value:String): WebSocketController {
      * Parms of successful result object are: limit,offset,filter,fields,sort
      */
     open fun prepareListQuery(request:JSONObject,session:Session?): JSONObject {
-        var query = JSONObject()
-        var result = JSONObject()
+        val query = JSONObject()
+        val result = JSONObject()
         var fields = ArrayList<String>()
-        var parser = JSONParser()
+        val parser = JSONParser()
         if (request.containsKey("fields")) {
             var parseFieldsError = false;
             if (request["fields"] is String) {
@@ -243,8 +318,8 @@ enum class AdminController(val value:String): WebSocketController {
             }
             query["limit"] = limit
         }
+        var failedSort = false
         if (request.containsKey("sort")) {
-            var failedSort = false;
             var sort = JSONObject()
             var sortPair: Pair<String,String>? = null
             if (request["sort"].toString().isEmpty()) {
@@ -281,15 +356,15 @@ enum class AdminController(val value:String): WebSocketController {
                         }
                     }
                 }
-                if (failedSort) {
-                    result["status"] = "error"
-                    result["field"] = "sort"
-                    return result
-                }
                 if (sortPair!=null) {
-                    query["sort"] = sortPair!!
+                    query["sort"] = sortPair
                 }
             }
+        }
+        if (failedSort) {
+            result["status"] = "error"
+            result["field"] = "sort"
+            return result
         }
         return query
     }

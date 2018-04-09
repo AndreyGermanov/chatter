@@ -107,7 +107,7 @@ open class DBModel(db:MongoDatabase,colName:String) {
      * Removes current model from MongoDB database
      * @param callback Callback function after complete
      */
-    fun remove(callback: () -> Unit) {
+    open fun remove(callback: () -> Unit) {
         var col = db.getCollection(collectionName)
         col.deleteOne(Document("_id",doc["_id"]))
         callback()

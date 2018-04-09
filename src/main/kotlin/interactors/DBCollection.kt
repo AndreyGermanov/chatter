@@ -258,10 +258,13 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      *          If not specified, natural sorting used, as loaded from database
      * @return JSONArray with all models, which meet criteria
      */
-    fun getListJSON(params:JSONObject):JSONArray {
+    fun getListJSON(params:JSONObject?=null):JSONArray {
         val results = JSONArray()
         val models = this.getList(params)
-        val fields = params["fields"] as? ArrayList<String>
+        var fields:ArrayList<String>? = null
+        if (params !=null && params["fields"]!=null) {
+            fields = params["fields"] as? ArrayList<String>
+        }
         for (modelObj in models) {
             val jsonObj = JSONObject()
             val model = modelObj as DBModel
@@ -380,12 +383,20 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      */
     fun remove(id:String,callback:(status:Boolean)->Unit) {
         val obj = getById(id)
+        Logger.log(LogLevel.DEBUG,"Begin removing object $id from collection.","DBCollection","remove")
         if (obj == null) {
             callback(false)
+            Logger.log(LogLevel.DEBUG,"Object with $id not found in collection.","DBCollection","remove")
         } else {
             val model = obj as DBModel
+            Logger.log(LogLevel.DEBUG,"Removing $id from MongoDB Database.","DBCollection","remove")
             model.remove {
-                models.remove(model)
+                Logger.log(LogLevel.DEBUG,"Removing $model from collection.","DBCollection","remove")
+                if (models.remove(model)) {
+                    Logger.log(LogLevel.DEBUG,"Removed $model from collection.","DBCollection","remove")
+                } else {
+                    Logger.log(LogLevel.DEBUG,"Failed to remove $model from collection.","DBCollection","remove")
+                }
                 callback(true)
             }
         }

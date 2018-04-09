@@ -78,7 +78,7 @@ class User(db:MongoDatabase,colName:String) : DBModel(db,colName) {
     }
 
     /**
-     * Function returns path to user profile image, relative to appliation root path if image exists
+     * Function returns path to user profile image, relative to application root path if image exists
      * Otherwise returns null
      *
      * @return callback with path as String
@@ -92,4 +92,14 @@ class User(db:MongoDatabase,colName:String) : DBModel(db,colName) {
         }
     }
 
+    /**
+     * Function used to remove current user, associated session and profile image
+     * @param callback Callback function after complete
+     */
+    override fun remove(callback: () -> Unit) {
+        var user_id = this["_id"]
+        super.remove {
+
+        }
+    }
 }

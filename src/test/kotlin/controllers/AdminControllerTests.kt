@@ -67,23 +67,35 @@ class AdminControllerTests: WSEchoSocketDelegate {
         app.rooms.addModel(room)
         var user = User(app.dBServer.db,"users")
         user["login"] = "Andrey";user["birthDate"] = 1045;user["active"] = true;user["role"]=2;user["_id"]="12345"
+        user.save() {};
         app.users.addModel(user)
         var session = Session(app.dBServer.db,"sessions",user)
         session["_id"] = "12345";session["user_id"] = "12345";session["room"] = "r1";
         session["loginTime"] = (System.currentTimeMillis()/1000).toInt()
         session["lastActivityTime"] = session["loginTime"]!!
+        session.save{}
         app.sessions.addModel(session)
 
-        user = User(app.dBServer.db,"users")
-        user["login"] = "arnold";user["birthDate"] = 2;user["active"] = true;app.users.addModel(user)
-        user = User(app.dBServer.db,"users")
-        user["login"] = "143Man";user["birthDate"] = 6453;user["active"] = false;app.users.addModel(user)
-        user = User(app.dBServer.db,"users")
-        user["login"] = "Ben";user["birthDate"] = 9321124;user["active"] = false;app.users.addModel(user)
-        user = User(app.dBServer.db,"users")
-        user["login"] = "john";user["birthDate"] = 9321124;user["active"] = true;app.users.addModel(user)
-        user = User(app.dBServer.db,"users")
-        user["login"] = "Josh";user["birthDate"] = 24435;user["active"] = true;app.users.addModel(user)
+        user = User(app.dBServer.db,"users");user["_id"]="1";
+        user["login"] = "arnold";user["birthDate"] = 2;user["active"] = true;user.save() {};app.users.addModel(user)
+        session = Session(app.dBServer.db,"sessions",user);session["_id"] = "1"
+        session["user_id"] = "1";session["room"] = "r1";session.save{};app.sessions.addModel(session)
+        user = User(app.dBServer.db,"users");user["_id"]="2";
+        user["login"] = "143Man";user["birthDate"] = 6453;user["active"] = false;user.save{};app.users.addModel(user)
+        session = Session(app.dBServer.db,"sessions",user);session["_id"] = "2"
+        session["user_id"] = "2";session["room"] = "r1";session.save{};app.sessions.addModel(session)
+        user = User(app.dBServer.db,"users");user["_id"]="3";
+        user["login"] = "Ben";user["birthDate"] = 9321124;user["active"] = false;user.save{};app.users.addModel(user)
+        session = Session(app.dBServer.db,"sessions",user);session["_id"] = "3"
+        session["user_id"] = "3";session["room"] = "r1";session.save{};app.sessions.addModel(session)
+        user = User(app.dBServer.db,"users");user["_id"]="4";
+        user["login"] = "john";user["birthDate"] = 9321124;user["active"] = true;user.save{};app.users.addModel(user)
+        session = Session(app.dBServer.db,"sessions",user);session["_id"] = "4"
+        session["user_id"] = "4";session["room"] = "r1";session.save{};app.sessions.addModel(session)
+        user = User(app.dBServer.db,"users");user["_id"]="5";
+        user["login"] = "Josh";user["birthDate"] = 24435;user["active"] = true;user.save{};app.users.addModel(user)
+        session = Session(app.dBServer.db,"sessions",user);session["_id"] = "5"
+        session["user_id"] = "5";session["room"] = "r1";session.save{};app.sessions.addModel(session)
         defaultRequest = JSONObject(mapOf(
                 "request_id" to "12345",
                 "user_id" to "12345",
@@ -227,7 +239,7 @@ class AdminControllerTests: WSEchoSocketDelegate {
         var request = defaultRequest
         request["action"] = "admin_get_users_list"
         request["sort"] = JSONObject(mapOf("birthDate" to "ASC"))
-        var fields = JSONArray();fields.add("login");fields.add("birthDate")
+        var fields = JSONArray();fields.add("login");fields.add("birthDate");fields.add("first_name");fields.add("last_name")
         request["fields"] = fields
         request["offset"] = 2
         request["limit"] = 3
@@ -243,6 +255,42 @@ class AdminControllerTests: WSEchoSocketDelegate {
         }
         assertEquals("Should return list with correct number of items after applying all conditions",2,list.count())
         assertEquals("Should return items with correct sort order","Josh",(list[0] as JSONObject)["login"].toString())
+    }
+
+    @Test
+    fun remove_users_external_full_cycle() {
+        app.webServer.start()
+        ws.delegate = this
+        client.start()
+        var con = client.connect(ws, URI("ws://localhost:"+app.port+"/websocket"))
+        ws_session = con.get()
+        var request = defaultRequest
+        request["action"] = "admin_remove_users"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        var response = parser.parse(this.webSocketResponse) as JSONObject
+        assertEquals("Should return error if user list is not provided","error",response["status"].toString())
+        request["list"] = "something weird"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        assertEquals("Should return error if incorrect user list provided","error",response["status"].toString())
+        var list = JSONArray()
+        list.add("25");list.add("32")
+        request["list"] = list
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        assertEquals("Should not remove users which does not exist ",0,response["count"].toString().toInt())
+        list = JSONArray()
+        list.add("3")
+        list.add("2")
+        list.add("12345")
+        request["list"] = list
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(1000)
+        assertEquals("Should remove users excluding myself from database",4,app.dBServer.db.getCollection("users").find().count())
+        assertEquals("Should remove sessions excluding myself from database",4,app.dBServer.db.getCollection("sessions").find().count())
     }
 
 }

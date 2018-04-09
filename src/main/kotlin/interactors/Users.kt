@@ -13,7 +13,6 @@ import org.json.simple.JSONObject
 import utils.BCrypt
 import utils.LogLevel
 import utils.Logger
-import utils.SendMail
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
@@ -54,6 +53,19 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
      */
     override fun addItem(doc: Document, schema: HashMap<String,String>?) {
         User(db, collectionName).addFromJSON(doc,this)
+    }
+
+    /**
+     * Function sends activation email to specified user and returns status of operation
+     *
+     * @param user : User model to which email send message
+     * @returns True if email send successfuly or False otherwise
+     */
+    fun sendActivationEmail(user:User):Boolean {
+        app.smtpClient.init(user["email"].toString(),"Chatter Account Activation")
+        val result = app.smtpClient.sendMessage("Please, follow this link to activate your Chatter account "+
+                app.host+":"+app.port.toString()+"/activate/"+user["_id"])
+        return result
     }
 
     /**
@@ -98,9 +110,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 user.save {
                     Logger.log(LogLevel.DEBUG,"Saved registered user. About to send activation email " +
                             "Params: $user.","Users","register")
-                    app.smtpClient.init(user["email"].toString(),"Chatter Account Activation")
-                    val result = app.smtpClient.sendMessage("Please, follow this link to activate your Chatter account "+
-                            app.host+":"+app.port.toString()+"/activate/"+user["_id"])
+                    val result = this.sendActivationEmail(user)
                     addModel(user)
                     if (result) {
                         Logger.log(LogLevel.DEBUG,"Success sending registered user activation email. Return success result" +
@@ -313,6 +323,41 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             }
         }
     }
+
+    /**
+     * Function used to remove users with specified ids from database and from collection
+     * including profile images
+     *
+     * @returns Number of removed users
+     */
+    fun removeUsers(user_ids:ArrayList<String>):Int {
+        var result = 0;
+        for (user_id in user_ids) {
+            if (this.getById(user_id)==null) {
+                continue
+            }
+            this.remove(user_id) {}
+            Files.deleteIfExists(Paths.get(app.usersPath+"/"+user_id+"/profile.png"))
+            try {
+                Files.deleteIfExists(Paths.get(app.usersPath+"/"+user_id))
+            } catch (e:Exception) {}
+            var sessions = ChatApplication.sessions.getListBy("user_id",user_id)
+            if (sessions==null || sessions.count()==0) {
+                continue
+            }
+            var it = sessions.iterator()
+            while (it.hasNext()) {
+                var session = it.next() as? Session
+                if (session==null || session["_id"]==null) {
+                    continue
+                }
+                app.sessions.remove(session["_id"].toString()){}
+            }
+            result++
+        }
+        return result
+    }
+
     /**
      * User registration result codes
      */
