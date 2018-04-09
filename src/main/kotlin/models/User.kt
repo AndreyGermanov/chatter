@@ -91,15 +91,4 @@ class User(db:MongoDatabase,colName:String) : DBModel(db,colName) {
             callback(null)
         }
     }
-
-    /**
-     * Function used to remove current user, associated session and profile image
-     * @param callback Callback function after complete
-     */
-    override fun remove(callback: () -> Unit) {
-        var user_id = this["_id"]
-        super.remove {
-
-        }
-    }
 }

@@ -336,7 +336,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             if (this.getById(user_id)==null) {
                 continue
             }
-            this.remove(user_id) {}
+            app.users.remove(user_id) {}
             Files.deleteIfExists(Paths.get(app.usersPath+"/"+user_id+"/profile.png"))
             try {
                 Files.deleteIfExists(Paths.get(app.usersPath+"/"+user_id))

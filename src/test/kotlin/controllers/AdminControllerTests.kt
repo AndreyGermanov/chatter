@@ -288,9 +288,10 @@ class AdminControllerTests: WSEchoSocketDelegate {
         list.add("12345")
         request["list"] = list
         ws_session.remote.sendString(toJSONString(request))
-        Thread.sleep(1000)
+        Thread.sleep(500)
         assertEquals("Should remove users excluding myself from database",4,app.dBServer.db.getCollection("users").find().count())
         assertEquals("Should remove sessions excluding myself from database",4,app.dBServer.db.getCollection("sessions").find().count())
+        assertEquals("Should remove users excluding myself from collection",4,app.users.count())
+        assertEquals("Should remove sessions excluding myself from collection",4,app.sessions.count())
     }
-
 }

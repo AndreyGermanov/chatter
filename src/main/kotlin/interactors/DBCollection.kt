@@ -34,7 +34,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
 
     var collectionName = ""
     var db:MongoDatabase
-    protected var models: ArrayList<Any> = ArrayList<Any>()
+    protected var models: ArrayList<Any> = ArrayList()
     var currentItem = 0
     var app = ChatApplication
 
