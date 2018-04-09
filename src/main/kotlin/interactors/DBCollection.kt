@@ -122,17 +122,28 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      *          If not specified, natural sorting used, as loaded from database
      * @return ArrayList with all models, which meet criteria
     */
-    fun getList(params:JSONObject):ArrayList<Any> {
-        val filter = params["filter"]?.toString() ?: ""
-        val fields = params["fields"] as? ArrayList<String>
-        val limit = params["limit"]?.toString()?.toInt() ?: 0
-        val offset = params["offset"]?.toString()?.toInt() ?: 0
-        val sort = params["sort"] as? Pair<String,String>
+    fun getList(params:JSONObject?=null):ArrayList<Any> {
+        var filter = ""
+        var fields:ArrayList<String>? = null
+        var limit = 0
+        var offset = 0
+        var sort:Pair<String,String>? = null
+        if (params!=null) {
+            filter = params["filter"]?.toString() ?: ""
+            if (params["fields"] is ArrayList<*>) {
+                fields = params["fields"] as ArrayList<String>
+            }
+            limit = params["limit"]?.toString()?.toInt() ?: 0
+            offset = params["offset"]?.toString()?.toInt() ?: 0
+            if (params["sort"] is Pair<*,*>) {
+                sort = params["sort"] as Pair<String, String>
+            }
+        }
         var results = ArrayList<Any>()
         if (!filter.isEmpty()) {
             this.models.map { it as DBModel }.forEach {
                 for ((field,_) in schema) {
-                    if (it[field] != null && (fields==null || fields.contains(field))) {
+                    if (it[field] != null && (fields==null || fields!!.contains(field))) {
                         if (it[field].toString().toLowerCase().startsWith(filter,true)) {
                             results.add(it)
                         }
@@ -140,7 +151,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
                 }
             }
         } else {
-            results = this.models
+            results.addAll(this.models)
         }
         if (sort!=null && schema[sort.first]!=null) {
             var sortField = sort.first
@@ -208,8 +219,8 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
                         }
                     }
                     else -> {
-                        var v1 = p1[sortField]?.toString() ?: ""
-                        var v2 = p2[sortField]?.toString() ?: ""
+                        var v1 = p1[sortField]?.toString()?.toLowerCase() ?: ""
+                        var v2 = p2[sortField]?.toString()?.toLowerCase() ?: ""
                         if (v1>v2) {
                             1*corrector
                         } else if (v1<v2) {
@@ -222,11 +233,16 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             })
         }
         if (offset>0 || limit>0) {
-            var endIndex = limit
-            if (endIndex == 0) {
+            var endIndex = offset+limit
+            if (endIndex == 0 || endIndex>results.size) {
                 endIndex = results.size
             }
-            results = results.subList(offset,endIndex) as ArrayList<Any>
+            var sublist = results.subList(offset,endIndex)
+            if (sublist.count()>0) {
+                var subListArray = ArrayList<Any>()
+                subListArray.addAll(sublist)
+                return subListArray
+            }
         }
         return results
     }
@@ -255,9 +271,10 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
                 }
             }
             if (jsonObj.count()>0) {
+                results.add(jsonObj)
+            } else {
                 Logger.log(LogLevel.DEBUG,"Empty JSON for model $model, using fields: $fields","DBCollection",
                         "getListJSON")
-                results.add(jsonObj)
             }
         }
         return results

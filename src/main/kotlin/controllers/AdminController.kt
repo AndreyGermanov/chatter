@@ -54,16 +54,10 @@ enum class AdminController(val value:String): WebSocketController {
             Logger.log(LogLevel.DEBUG,"Prepared list for admin_get_users_list request. Username: $username," +
                     "Remote IP: $sessionIP, Request: $request, List: $usersArray","AdminController",
                     "admin_get_users_list.exec")
-            if (usersArray.count()>0) {
+            if (usersArray.count()>=0) {
                 result["status"] = "ok"
                 result["status_code"] = AdminControllerRequestResults.RESULT_OK
                 result["list"] = usersArray
-            } else {
-                Logger.log(LogLevel.WARNING,"Prepared list for admin_get_users_list_request is empty. " +
-                        "Username: $username, Remote IP: $sessionIP, Request: $request","AdminController",
-                        "admin_get_users_list.exec")
-                result["status"] = "error"
-                result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_EMPTY_RESULT
             }
             return result
         }
@@ -186,8 +180,9 @@ enum class AdminController(val value:String): WebSocketController {
             result["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
             result["field"] = "filter"
             return result
+        } else if (request.containsKey("filter")) {
+            query["filter"] = request["filter"].toString().trim()
         }
-        query["filter"] = request["filter"].toString().trim()
         var offset = 0
         if (request.containsKey("offset")) {
             var offsetFailure = false

@@ -26,10 +26,10 @@ import java.util.zip.CRC32
 /**
  * Created by andrey on 2/25/18.
  */
-class MessageCenterTest {
+class MessageCenterTest: WSEchoSocketDelegate {
 
     val app = ChatApplication
-    var webSocketResponse:String = ""
+    override var webSocketResponse:String = ""
     val parser = JSONParser()
     val client = WebSocketClient()
     val ws = SimpleEchoSocket()

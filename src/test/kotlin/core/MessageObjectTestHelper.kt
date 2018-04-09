@@ -11,6 +11,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
+interface WSEchoSocketDelegate {
+    var webSocketResponse: String
+}
 /**
  * Created by andrey on 2/24/18.
  */
@@ -18,7 +21,7 @@ import java.util.concurrent.TimeUnit
 class SimpleEchoSocket() {
     private val closeLatch: CountDownLatch
     private var session: Session? = null
-    lateinit var delegate:MessageCenterTest
+    lateinit var delegate:WSEchoSocketDelegate
     var lastResponse = ""
 
     init {
