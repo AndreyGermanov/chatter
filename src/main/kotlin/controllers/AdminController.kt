@@ -6,12 +6,13 @@ package controllers
 import core.ChatApplication
 import core.MessageCenter
 import interactors.Users
+import models.DBModel
+import models.User
 import org.eclipse.jetty.websocket.api.Session
 import org.json.simple.JSONArray
 import org.json.simple.JSONObject
-import utils.LogLevel
-import utils.Logger
 import org.json.simple.parser.JSONParser
+import utils.*
 
 /**
  * Set of actions, which can execute only user with ADMIN role
@@ -39,8 +40,7 @@ enum class AdminController(val value:String): WebSocketController {
          *          and offset
          */
         override fun exec(request:JSONObject, session:Session?): JSONObject {
-            var result = JSONObject()
-            var usersArray = JSONArray()
+            var response = JSONObject()
             val username = request["username"].toString();
             Logger.log(LogLevel.DEBUG, "Begin admin_get_users_list action. Username: $username. " +
                     "Remote IP: $sessionIP. Request: $request.","AdminController","admin_get_users_list.exec")
@@ -50,58 +50,232 @@ enum class AdminController(val value:String): WebSocketController {
             }
             Logger.log(LogLevel.DEBUG,"Prepared query to users collection: $query. Username: $username," +
                     "Remote IP: $sessionIP, request: $request","AdminController","admin_get_users_list.exec")
-            usersArray = ChatApplication.users.getListJSON(query)
+            var usersArray = ChatApplication.users.getListJSON(query)
             Logger.log(LogLevel.DEBUG,"Prepared list for admin_get_users_list request. Username: $username," +
                     "Remote IP: $sessionIP, Request: $request, List: $usersArray","AdminController",
                     "admin_get_users_list.exec")
             if (usersArray.count()>=0) {
-                result["status"] = "ok"
-                result["status_code"] = AdminControllerRequestResults.RESULT_OK
-                result["list"] = usersArray
+                response["status"] = "ok"
+                response["status_code"] = AdminControllerRequestResults.RESULT_OK
+                response["list"] = usersArray
             }
-            return result
+            return response
         }
     },
+    /**
+     * Action used to get single user record by field name or value
+     */
     admin_get_user("admin_get_user"),
+    /**
+     * Action used to create new user.
+     *
+     */
+    admin_add_user("admin_add_user") {
+        /** Function used to validate user fields and populate User model with these fields
+         * @param fields JSONArray of fields. Each item is JSONObject
+         * in format {"field_name":"field_value"}.
+         * @return If validated correctly, returns "User" model instance ready to be saved to database,
+         * if error, returns JSON object with error status, code and field
+         */
+        fun validateFields(fields:JSONArray):Any {
+            val logInfo = "Username: $username,Remote IP: $sessionIP."
+            var error = JSONObject()
+            var user = this.createModel<User>(User(ChatApplication.dBServer.db,"users"),fields)
+            if (user["login"] == null) {
+                Logger.log(LogLevel.WARNING,"'login' field is required. Fields: $fields. $logInfo",
+                        "AdminController","admin_get_user.validateFields")
+                error["status"] = "error"
+                error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
+                error["field"] = "login"
+                return error
+            }
+            if (user["email"] == null) {
+                Logger.log(LogLevel.WARNING,"'email' field is required. Fields: $fields. $logInfo",
+                        "AdminController","admin_get_user.validateFields")
+                error["status"] = "error"
+                error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
+                error["field"] = "email"
+                return error
+
+            }
+            if (user["default_room"]==null) {
+                Logger.log(LogLevel.WARNING,"'default_room' field is required. Fields: $fields. $logInfo",
+                        "AdminController","admin_get_user.validateFields")
+                error["status"] = "error"
+                error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
+                error["field"] = "default_room"
+                return error
+            }
+            if (ChatApplication.users.getBy("login",user["login"].toString()) != null) {
+                Logger.log(LogLevel.WARNING,"Model with provided 'login'=${user["login"]} already exists in database: " +
+                        "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                error["status"] = "error"
+                error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_ALREADY_EXISTS
+                error["field"] = "login"
+                return error
+            }
+            if (!isValidEmail(user["email"].toString())) {
+                Logger.log(LogLevel.WARNING,"Invalid email format 'email'=${user["email"]} " +
+                        "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                error["status"] = "error"
+                error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
+                error["field"] = "email"
+                return error
+            }
+            if (ChatApplication.users.getBy("email",user["email"].toString()) != null) {
+                Logger.log(LogLevel.WARNING,"Model with provided 'email'=${user["email"]} already exists in database: " +
+                        "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                error["status"] = "error"
+                error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_ALREADY_EXISTS
+                error["field"] = "email"
+                return error
+            }
+            if (ChatApplication.rooms.getById(user["default_room"].toString())==null) {
+                Logger.log(LogLevel.WARNING,"Provided default room ='${user["default_room"]}' does not exist." +
+                        "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                error["status"] = "error"
+                error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
+                error["field"] = "default_room"
+                return error
+            }
+            if (user["birthDate"]!=null) {
+                val birthDate = user["birthDate"].toString().toInt()
+                if (birthDate<0 || birthDate>(System.currentTimeMillis()/1000).toInt()) {
+                    Logger.log(LogLevel.WARNING,"Incorrect birthDate='$birthDate' " +
+                            "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                    error["status"] = "error"
+                    error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
+                    error["field"] = "birthDate"
+                    return error
+                }
+            }
+            if (user["gender"]!=null) {
+                if (user["gender"].toString()!="M" && user["gender"].toString()!="F") {
+                    Logger.log(LogLevel.WARNING, "Incorrect gender='${user["gender"]}' " +
+                            "$fields. $logInfo", "AdminController", "admin_get_user.validateFields")
+                    error["status"] = "error"
+                    error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
+                    error["field"] = "gender"
+                    return error
+                }
+            }
+            if (user["role"]!=null) {
+                val role = user["role"].toString().toInt()
+                if (role!=1 && role!=2) {
+                    Logger.log(LogLevel.WARNING,"Incorrect role='${user["role"]}' " +
+                            "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                    error["status"] = "error"
+                    error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
+                    error["field"] = "role"
+                    return error
+                }
+            } else {
+                user["role"] = 1
+            }
+            if (user["password"] != null) {
+                val password = user["password"].toString().trim()
+                if (password.isEmpty()) {
+                    Logger.log(LogLevel.WARNING,"Password should no be empty" +
+                            "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                    error["status"] = "error"
+                    error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
+                    error["field"] = "password"
+                    return error
+                } else {
+                    user["password"] = BCrypt.hashpw(password, BCrypt.gensalt(12))
+                }
+            }
+            if (user["first_name"] != null) {
+                user["first_name"] = user["first_name"].toString().trim().toLowerCase().capitalize()
+            }
+            if (user["last_name"] != null) {
+                user["last_name"] = user["last_name"].toString().trim().toLowerCase().capitalize()
+            }
+            if (user["active"] == null) {
+                user["active"] = false
+            }
+            return user
+        }
+
+        /**
+         * Action executor which adds new user to database and to Users collection
+         *
+         * @param request: Request object which must contain "fields" JSONArray, each of items is JSONObject
+         * in format {"field_name":"field_value"}.
+         * @return result of operation as objec with fields:
+         *          status - result of operation: "ok" or "error"
+         *          status_code - RESULT_OK or error code as AdminController enumeration request result
+         *          user - added user record in case of success
+         */
+        override fun exec(request:JSONObject,session:Session?):JSONObject {
+            val logInfo = "Username: $username,Remote IP: $sessionIP. Request: $request"
+            Logger.log(LogLevel.DEBUG,"Begin admin_add_user request handler. $logInfo",
+                    "AdminController","admin_add_user.exec")
+            var response = JSONObject()
+            var fields:JSONArray?
+            val parse_response = parseJSONArrayFromRequest(request,"fields",session)
+            if (parse_response["status"].toString() == "ok") {
+                fields = parse_response["result"] as JSONArray
+            } else {
+                Logger.log(LogLevel.DEBUG,"Error parsing fields to JSON: ${request["fields"]}. $logInfo",
+                        "AdminController","admin_add_user.exec")
+                return parse_response
+            }
+            Logger.log(LogLevel.DEBUG,"Begin fields validation for fields: $fields. $logInfo",
+                    "AdminController","admin_add_user.exec")
+            val result = this.validateFields(fields)
+            if (result is JSONObject) {
+                Logger.log(LogLevel.WARNING,"Errors during fields validation: $fields. $logInfo",
+                        "AdminController","admin_add_user.exec")
+                return result
+            } else if (result is User ){
+                result.save{}
+                ChatApplication.users.addModel(result)
+                response["status"] = "ok"
+                response["status_code"] = AdminControllerRequestResults.RESULT_OK
+                var user_obj = result.toJSON()
+                if (user_obj.containsKey("password")) {
+                    user_obj.remove("password")
+                }
+                response["user"] = user_obj
+            }
+            return response
+        }
+    },
     admin_update_user("admin_update_user"),
+    /**
+     * Action used to remove users from database
+     */
     admin_remove_users("admin_remove_users") {
+        /**
+         * Action executor
+         *
+         * @param request - User remove request. should contain "list" of user_id items to remove as JSON Array
+         * @param session - Link to Client WebSocket session instance
+         * @return JSON object with either error or success information. Error includes "status_code" with information
+         * about error. Success includes "count" field, which contains actual number of removed items.
+         */
         override fun exec(request:JSONObject, session:Session?): JSONObject {
-            Logger.log(LogLevel.DEBUG, "Begin admin_remove_users action. Username: $username. " +
-                    "Remote IP: $sessionIP. Request: $request.","AdminController","admin_get_users_list.exec")
+            val logInfo =  "Username: $username. Remote IP: $sessionIP. Request: $request"
+            Logger.log(LogLevel.DEBUG, "Begin admin_remove_users action. $logInfo",
+                    "AdminController","admin_get_users_list.exec")
             val response = JSONObject()
-            val parser = JSONParser()
             if (request["list"]==null) {
                 response["status"] = "error"
                 response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
                 response["field"] = "list"
-                Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty." +
-                        "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
-                        "admin_remove_users.exec")
+                Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty. " +
+                        "$logInfo", "AdminController,","admin_remove_users.exec")
                 return response
             }
-            var list:JSONArray? = null
-            if (request["list"] is String) {
-                try {
-                    list = parser.parse(request["list"].toString()) as JSONArray
-                } catch (e:Exception) {
-                    response["status"] = "error"
-                    response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
-                    response["field"] = "list"
-                    Logger.log(LogLevel.WARNING,"Could not parse list of users to remove from ${request["list"]}." +
-                            "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
-                            "admin_remove_users.exec")
-                }
-            } else if (request["list"] is JSONArray) {
-                list = request["list"] as JSONArray
-            }
-            if (list==null || list.count()==0) {
-                response["status"] = "error"
-                response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
-                response["field"] = "list"
-                Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty." +
-                        "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
-                        "admin_remove_users.exec")
-                return response
+            var list:JSONArray?
+            val parse_response = parseJSONArrayFromRequest(request,"list",session)
+            if (parse_response["status"].toString() == "ok") {
+                list = parse_response["result"] as JSONArray
+            } else {
+                Logger.log(LogLevel.DEBUG,"Error parsing fields to JSON: ${request["fields"]}. $logInfo",
+                        "AdminController","admin_remove_users.exec")
+                return parse_response
             }
             val user_ids = ArrayList<String>()
             val it = list.iterator()
@@ -111,29 +285,27 @@ enum class AdminController(val value:String): WebSocketController {
                     user_ids.add(user_id)
                 } else if (user_id == request["user_id"].toString()) {
                     Logger.log(LogLevel.WARNING,"One of user_ids passed to action belongs to originator of request." +
-                            "Sorry, you can not delete yourself. Your ID filtered from list. Username: $username," +
-                            "Remote IP: $sessionIP,Request:$request")
+                            "Sorry, you can not delete yourself. Your ID filtered from list. $logInfo",
+                            "AdminController","admin_remove_users_.exec")
                 }
             }
             if (user_ids.count()==0) {
                 response["status"] = "error"
                 response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
                 response["field"] = "list"
-                Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty." +
-                        "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
-                        "admin_remove_users.exec")
+                Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty. " +
+                        "$logInfo","AdminController", "admin_remove_users.exec")
                 return response
             }
-            Logger.log(LogLevel.DEBUG,"Prepared list of users to remove: $user_ids. Removing ...Username: $username," +
-                    "Remote IP: $sessionIP,Request:$request","AdminController","admin_remove_users.exec")
+            Logger.log(LogLevel.DEBUG,"Prepared list of users to remove: $user_ids. Removing ... $logInfo",
+                    "AdminController","admin_remove_users.exec")
             val removed_count = ChatApplication.users.removeUsers(user_ids)
             if (removed_count == 0) {
-                Logger.log(LogLevel.WARNING,"Did not remove any user. Probable ids are incorrect" +
-                        "Username: $username,Remote IP: $sessionIP,Request:$request","AdminController",
-                        "admin_remove_users.exec")
+                Logger.log(LogLevel.WARNING,"Did not remove any user. Probable ids are incorrect. $logInfo" +
+                        "AdminController", "admin_remove_users.exec")
             } else {
-                Logger.log(LogLevel.DEBUG,"Successfuly removed $removed_count items. Username: $username," +
-                        "Remote IP: $sessionIP,Request:$request","AdminController","admin_remove_users.exec")
+                Logger.log(LogLevel.DEBUG,"Successfuly removed $removed_count items. $logInfo",
+                        "AdminController","admin_remove_users.exec")
             }
             response["status"] = "ok"
             response["status_code"] = AdminControllerRequestResults.RESULT_OK
@@ -145,6 +317,7 @@ enum class AdminController(val value:String): WebSocketController {
     override var user: models.User? = null
     override var username: String = ""
     override var sessionIP = ""
+    val parser = JSONParser()
 
     override open fun exec(request: JSONObject, session: Session?): JSONObject {
         return JSONObject()
@@ -368,6 +541,89 @@ enum class AdminController(val value:String): WebSocketController {
         }
         return query
     }
+
+    /**
+     * Function used to create database model of specified type T and fill it
+     * with values from [fields] array. Function implements basic validation
+     * using schema of this model and returns object filled only with fields
+     * which passed validation
+     *
+     * @param model:  Empty model of type T
+     * @param fields: Array of fields in format [{key:value},{key:value}]
+     * @return model filled with field values after validation
+     */
+    fun <T: DBModel> createModel(model:T,fields:JSONArray):T {
+        val logInfo = "Username: $username,Remote IP: $sessionIP."
+        var error = JSONObject()
+        var fields_iterator = fields.iterator()
+        while (fields_iterator.hasNext()) {
+            val field_object = fields_iterator.next()
+            val field = toJSONObject(field_object)
+            if(field == null || field.count() != 1) {
+                Logger.log(LogLevel.WARNING,"Incorrect format of field definition $field_object - $field.  $logInfo",
+                        "AdminController","createModel")
+                continue
+            }
+            val field_keys = field.keys.iterator()
+            val field_key_obj = field_keys.next()
+            if (field_key_obj !is String) {
+                Logger.log(LogLevel.WARNING,"Incorrect format of field definition $field. $logInfo",
+                        "AdminController","createModel")
+                continue
+            }
+            val field_key = field_key_obj.toString()
+            if (!model.schema.containsKey(field_key) || field_key == "_id") {
+                Logger.log(LogLevel.WARNING,"Field '$field_key' does not exist in this model. $logInfo",
+                        "AdminController","createModel")
+                continue
+            }
+            val field_type = model.schema[field_key].toString()
+            val field_value_obj = field[field_key]
+            var fieldValueError = false
+            when (field_type) {
+                "Int" -> {
+                    try {
+                        model[field_key] = field_value_obj.toString().toInt()
+                    } catch (e:Exception) {
+                        Logger.log(LogLevel.WARNING,"Field '$field_key' is not correct Int. $logInfo",
+                                "AdminController","createModel")
+                        fieldValueError = true
+                    }
+                }
+                "Double" -> {
+                    try {
+                        model[field_key] = field_value_obj.toString().toDouble()
+                    } catch (e:Exception) {
+                        Logger.log(LogLevel.WARNING,"Field '$field_key' is not correct Double. $logInfo",
+                                "AdminController","createModel")
+                        fieldValueError = true
+                    }
+                }
+                "Boolean" -> {
+                    try {
+                        model[field_key] = field_value_obj.toString().toBoolean()
+                    } catch (e:Exception) {
+                        Logger.log(LogLevel.WARNING,"Field '$field_key' is not correct Boolean. $logInfo",
+                                "AdminController","createModel")
+                        fieldValueError = true
+                    }
+                }
+                else -> {
+                    try {
+                        model[field_key] = field_value_obj.toString()
+                    } catch (e:Exception) {
+                        Logger.log(LogLevel.WARNING,"Field '$field_key' is not correct String. $logInfo",
+                                "AdminController","createModel")
+                        fieldValueError = true
+                    }
+                }
+            }
+            if (fieldValueError) {
+                continue
+            }
+        }
+        return model
+    }
     companion object {
         /**
          * Function converts string action name, received in WebSocket JSON request
@@ -395,6 +651,7 @@ enum class AdminControllerRequestResults(value:String) {
     RESULT_OK("RESULT_OK"),
     RESULT_ERROR_FIELD_IS_EMPTY("RESULT_ERROR_FIELD_IS_EMPTY"),
     RESULT_ERROR_INCORRECT_FIELD_VALUE("RESULT_ERROR_INCORRECT_FIELD_VALUE"),
+    RESULT_ERROR_FIELD_ALREADY_EXISTS("RESULT_ERROR_FIELD_ALREADY_EXISTS"),
     RESULT_ERROR_EMPTY_RESULT("RESULT_ERROR_EMPTY_RESUT");
     fun getMessage():String {
         var result = ""

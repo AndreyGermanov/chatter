@@ -5,7 +5,7 @@ import interactors.Rooms
 import interactors.Sessions
 import interactors.Users
 import io.javalin.Javalin
-import junit.framework.Assert.assertEquals
+import junit.framework.Assert.*
 import models.Room
 import models.Session
 import models.User
@@ -16,6 +16,7 @@ import org.json.simple.JSONObject
 import org.json.simple.parser.JSONParser
 import org.junit.Before
 import org.junit.Test
+import utils.toJSONObject
 import utils.toJSONString
 import java.net.URI
 
@@ -67,6 +68,7 @@ class AdminControllerTests: WSEchoSocketDelegate {
         app.rooms.addModel(room)
         var user = User(app.dBServer.db,"users")
         user["login"] = "Andrey";user["birthDate"] = 1045;user["active"] = true;user["role"]=2;user["_id"]="12345"
+        user["email"] = "andrey@it-port.ru"
         user.save() {};
         app.users.addModel(user)
         var session = Session(app.dBServer.db,"sessions",user)
@@ -96,6 +98,9 @@ class AdminControllerTests: WSEchoSocketDelegate {
         user["login"] = "Josh";user["birthDate"] = 24435;user["active"] = true;user.save{};app.users.addModel(user)
         session = Session(app.dBServer.db,"sessions",user);session["_id"] = "5"
         session["user_id"] = "5";session["room"] = "r1";session.save{};app.sessions.addModel(session)
+        room = Room(app.dBServer.db,"rooms");room["_id"] = "r2";room["name"] = "Room 2";room.save{};app.rooms.addModel(room)
+        room = Room(app.dBServer.db,"rooms");room["_id"] = "r3";room["name"] = "Room 3";room.save{};app.rooms.addModel(room)
+
         defaultRequest = JSONObject(mapOf(
                 "request_id" to "12345",
                 "user_id" to "12345",
@@ -293,5 +298,127 @@ class AdminControllerTests: WSEchoSocketDelegate {
         assertEquals("Should remove sessions excluding myself from database",4,app.dBServer.db.getCollection("sessions").find().count())
         assertEquals("Should remove users excluding myself from collection",4,app.users.count())
         assertEquals("Should remove sessions excluding myself from collection",4,app.sessions.count())
+    }
+
+    @Test
+    fun add_user_external_full_cycle() {
+        app.webServer.start()
+        ws.delegate = this
+        client.start()
+        var con = client.connect(ws, URI("ws://localhost:"+app.port+"/websocket"))
+        ws_session = con.get()
+        var request = defaultRequest
+        request["action"] = "admin_add_user"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        var response = parser.parse(this.webSocketResponse) as JSONObject
+        var status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return field empty error if no fields provided",
+                AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY,status_code)
+        request["fields"] = "BOODJE!"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return incorrect field error if garbage provided",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE,status_code)
+        request["fields"] = "[]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return empty field error if correct empty JSON provided",
+                AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY,status_code)
+        request["fields"] = "[\"rm -rf /*\",\"format c:\"]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return empty field error if incorrect fields list provided",
+                AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY,status_code)
+        request["fields"] = "[{\"login\":\"andrey\"},{\"blogin\":\"andrey\"}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertTrue("Should return empty field error for 'email' field after filtering request",
+                AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY == status_code &&
+                        response["field"].toString() == "email")
+        request["fields"] = "[{\"login\":\"andrey\"},{\"email\":\"andrey\"}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertTrue("Should return empty default_room error",
+                AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY == status_code &&
+                        response["field"].toString() == "default_room")
+        request["fields"] = "[{\"login\":\"andrey\"},{\"email\":\"andrey\"},{\"default_room\":\"noroom\"}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertTrue("Should return incorrect email error",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE == status_code &&
+                        response["field"].toString() == "email")
+        request["fields"] = "[{\"login\":\"andrey\"},{\"email\":\"andrey@email.ru\"},{\"default_room\":\"noroom\"}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertTrue("Should return incorrect default_room error",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE == status_code &&
+                        response["field"].toString() == "default_room")
+        request["fields"] = "[{\"login\":\"andrey\"},{\"email\":\"andrey@email.ru\"},{\"default_room\":\"r2\"}," +
+                "{\"birthDate\":\"1999999999\"}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertTrue("Should return incorrect birthDate error",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE == status_code &&
+                        response["field"].toString() == "birthDate")
+        request["fields"] = "[{\"login\":\"andrey\"},{\"email\":\"andrey@email.ru\"},{\"default_room\":\"r2\"}," +
+                "{\"birthDate\":\"1234567890\"},{\"gender\":\"D\"}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertTrue("Should return incorrect gender error",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE == status_code &&
+                        response["field"].toString() == "gender")
+        request["fields"] = "[{\"login\":\"andrey\"},{\"email\":\"andrey@email.ru\"},{\"default_room\":\"r2\"}," +
+                "{\"birthDate\":\"1234567890\"},{\"gender\":\"M\"},{\"role\":5}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertTrue("Should return incorrect role error",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE == status_code &&
+                        response["field"].toString() == "role")
+        request["fields"] = "[{\"login\":\"andrey\"},{\"email\":\"andrey@email.ru\"},{\"default_room\":\"r2\"}," +
+                "{\"birthDate\":\"1234567890\"},{\"gender\":\"M\"},{\"role\":2},{\"password\":\"\"}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertTrue("Should return empty password error",
+                AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY == status_code &&
+                        response["field"].toString() == "password")
+        request["fields"] = "[{\"login\":\"andrey\"},{\"email\":\"andrey@email.ru\"},{\"default_room\":\"r2\"}," +
+                "{\"birthDate\":\"1234567890\"},{\"gender\":\"M\"},{\"password\":\"12345\"}," +
+                "{\"first_name\":\"andrey\"},{\"last_name\":\"germanoV\"}]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        assertTrue("Should contain 'user' item",response.containsKey("user"))
+        var user = toJSONObject(response["user"])!!
+        assertNotNull("Should return '_id' field",user["_id"])
+        assertNull("Should not return 'password' field",user["password"])
+        assertEquals("Should contain correctly formatted first_name","Andrey",user["first_name"].toString())
+        assertEquals("Should contain correctly formatted last_name","Germanov",user["last_name"].toString())
+        assertFalse("Should not be activated by default",user["active"].toString().toBoolean())
+        assertEquals("Should be regular user by default",1,user["role"].toString().toInt())
+        ws_session.close()
+        con.cancel(true)
     }
 }

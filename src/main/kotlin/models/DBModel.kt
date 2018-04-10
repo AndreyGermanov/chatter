@@ -8,6 +8,7 @@ import org.bson.Document
 import org.bson.types.ObjectId
 import org.json.simple.JSONObject
 import org.json.simple.parser.JSONParser
+import utils.toJSONString
 
 /**
  * Base wrapper class for database Model, stored in MongoDB database
@@ -149,7 +150,7 @@ open class DBModel(db:MongoDatabase,colName:String) {
      * @return String representation of model
      */
     override fun toString() : String {
-        return doc.toString()
+        return doc.toJson()
     }
 
     /**
