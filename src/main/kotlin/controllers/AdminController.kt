@@ -112,8 +112,6 @@ enum class AdminController(val value:String): WebSocketController {
                 response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_OBJECT_NOT_FOUND
                 return response
             }
-            Logger.log(LogLevel.WARNING,"User not found. Condition: ${condition}. " +
-                    "Query: $condition_json. $logInfo", "AdminController","admin_get_user.exec")
             response["status"] = "ok"
             response["status_code"] = AdminControllerRequestResults.RESULT_OK
             val user_json = user.toJSON()
@@ -370,6 +368,7 @@ enum class AdminController(val value:String): WebSocketController {
     override open fun exec(request: JSONObject, session: Session?): JSONObject {
         return JSONObject()
     }
+
     /**
      * Function, which must be executed before any action to check, if request has
      * enough authentication information to use actions of this controller
@@ -409,6 +408,7 @@ enum class AdminController(val value:String): WebSocketController {
                 "Username: ${user["login"].toString()},Remote IP: $sessionIP.", "AdminController", "auth")
         return null
     }
+
     override open fun before(request: JSONObject, session: Session?): JSONObject {
         return UserController.update_user.before(request,session)
     }
