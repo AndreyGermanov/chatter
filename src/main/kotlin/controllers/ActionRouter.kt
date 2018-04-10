@@ -45,7 +45,7 @@ object ActionRouter {
             action = AdminController.action(actionName)
         }
         if (action == null) {
-            Logger.log(LogLevel.WARNING,"Could not find controller and handler for provided action '$action'. " +
+            Logger.log(LogLevel.WARNING,"Could not find controller and handler for provided action '$actionName'. " +
                     "Remote IP: $sessionIP, Request: $request", "ActionRouter","processAction")
             return system_error_response
         }

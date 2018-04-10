@@ -22,7 +22,7 @@ import utils.toJSONString
  */
 open class DBModel(db:MongoDatabase,colName:String) {
 
-    private var doc = Document()
+    var doc = Document()
     /**
      * Link to database schema from collection
      */
