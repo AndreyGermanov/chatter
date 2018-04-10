@@ -121,7 +121,7 @@ enum class AdminController(val value:String): WebSocketController {
                 user_json.remove("password")
             }
             response["user"] = user_json
-            Logger.log(LogLevel.DEBUG,"admin_get_user_request finished successfully. User: ${response["user"]}. " +
+            Logger.log(LogLevel.DEBUG,"admin_get_user action finished successfully. User: ${response["user"]}. " +
                     "Query: $condition_json. $logInfo", "AdminController","admin_get_user.exec")
             return response
         }
@@ -257,7 +257,7 @@ enum class AdminController(val value:String): WebSocketController {
         override fun exec(request:JSONObject, session:Session?): JSONObject {
             val logInfo =  "Username: $username. Remote IP: $sessionIP. Request: $request"
             Logger.log(LogLevel.DEBUG, "Begin admin_remove_users action. $logInfo",
-                    "AdminController","admin_get_users_list.exec")
+                    "AdminController","admin_remove_users.exec")
             val response = JSONObject()
             if (request["list"]==null) {
                 response["status"] = "error"
@@ -309,6 +309,55 @@ enum class AdminController(val value:String): WebSocketController {
             response["status"] = "ok"
             response["status_code"] = AdminControllerRequestResults.RESULT_OK
             response["count"] = removed_count
+            return response
+        }
+    },
+    /**
+     * Action used to send activation email to user in any moment of time
+     */
+    admin_send_activation_email("admin_send_activation_email") {
+        /**
+         * Action executor. Attempts to send activation email to user and returns result
+         * of operation
+         *
+         * @param request: Client request body which must have "id" field with _id of user to which
+         * activation email should be sent
+         * @param session: Link to WebSocket client session instance
+         * @return Object with result of operation. Consist of 'status' = "error" or "ok" and "status_code" with
+         * one of values of UserRegisterResultCode or AdminControllerRequestResults enumeration
+         */
+        override fun exec(request:JSONObject,session:Session?):JSONObject {
+            val logInfo =  "Username: $username. Remote IP: $sessionIP. Request: $request"
+            Logger.log(LogLevel.DEBUG, "Begin admin_send_activation_email action. $logInfo",
+                    "AdminController","admin_send_activation_email.exec")
+            var response = JSONObject()
+            response["status"] = "error"
+            response["field"] = "id"
+            if (!request.containsKey("id") || request["id"] !is String || request["id"].toString().isEmpty()) {
+                Logger.log(LogLevel.WARNING, "Field 'id' is empty or not string. id=${request["id"]}. $logInfo",
+                        "AdminController","admin_send_activation_email.exec")
+                response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
+                return response
+            }
+            val id = request["id"].toString()
+            val user = ChatApplication.users.getById(id)
+            if (user==null || user !is User) {
+                Logger.log(LogLevel.WARNING, "User not found. id=${request["id"]}. $logInfo",
+                        "AdminController","admin_send_activation_email.exec")
+                response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_OBJECT_NOT_FOUND
+                return response
+            }
+            val result = ChatApplication.users.sendActivationEmail(user)
+            if (!result) {
+                Logger.log(LogLevel.WARNING, "Could not send activation email to user: ${user.toJSON()}. $logInfo",
+                        "AdminController","admin_send_activation_email.exec")
+                response["status_code"] = Users.UserRegisterResultCode.RESULT_ERROR_ACTIVATION_EMAIL
+                return response
+            }
+            response["status"] = "ok"
+            response["status_code"] = Users.UserRegisterResultCode.RESULT_OK
+            Logger.log(LogLevel.DEBUG, "Activation email send successfully to user: ${user.toJSON()}. $logInfo",
+                    "AdminController","admin_send_activation_email.exec")
             return response
         }
     };

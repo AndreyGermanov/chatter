@@ -69,7 +69,7 @@ class AdminControllerTests: WSEchoSocketDelegate {
         var user = User(app.dBServer.db,"users")
         user["login"] = "Andrey";user["birthDate"] = 1045;user["active"] = true;user["role"]=2;user["_id"]="12345"
         user["email"] = "andrey@it-port.ru"
-        user.save() {};
+        user.save{};
         app.users.addModel(user)
         var session = Session(app.dBServer.db,"sessions",user)
         session["_id"] = "12345";session["user_id"] = "12345";session["room"] = "r1";
@@ -658,5 +658,42 @@ class AdminControllerTests: WSEchoSocketDelegate {
         val user = toJSONObject(response["user"])!!
         assertNull("Should not contain password field",user["password"])
         assertEquals("Should contain correct _id field","1",user["_id"])
+    }
+
+    @Test
+    fun send_activation_email_external_full_cycle() {
+        app.webServer.start()
+        ws.delegate = this
+        client.start()
+        var con = client.connect(ws, URI("ws://localhost:"+app.port+"/websocket"))
+        ws_session = con.get()
+        var request = defaultRequest
+        request["action"] = "admin_send_activation_email"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        var response = parser.parse(this.webSocketResponse) as JSONObject
+        var status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return empty field value error if no id provided",
+                AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY,status_code)
+        request["id"] = JSONObject()
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return object not found error if garbage provided",
+                AdminControllerRequestResults.RESULT_ERROR_OBJECT_NOT_FOUND,status_code)
+        request["id"] = "BOODJE!"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return object not found error if incorrect user id provided",
+                AdminControllerRequestResults.RESULT_ERROR_OBJECT_NOT_FOUND,status_code)
+        request["id"] = "12345"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(10000)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        assertEquals("Should return success status if sent email correctly.",
+                "ok",response["status"].toString())
     }
 }
