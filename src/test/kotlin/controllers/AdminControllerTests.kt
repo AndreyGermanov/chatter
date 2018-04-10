@@ -606,4 +606,57 @@ class AdminControllerTests: WSEchoSocketDelegate {
         ws_session.close()
         con.cancel(true)
     }
+
+    @Test
+    fun get_user_external_full_cycle() {
+        app.webServer.start()
+        ws.delegate = this
+        client.start()
+        var con = client.connect(ws, URI("ws://localhost:"+app.port+"/websocket"))
+        ws_session = con.get()
+        var request = defaultRequest
+        request["action"] = "admin_get_user"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        var response = parser.parse(this.webSocketResponse) as JSONObject
+        var status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return incorrect field value error if no query provided",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE,status_code)
+        request["query"] = "BOODJE!"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return incorrect field error if garbage provided",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE,status_code)
+        request["query"] = "[]"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return incorrect field error if correct empty JSON provided",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE,status_code)
+        request["query"] = "{\"rm -rf /*\",\"format c:\"}"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return incorrect field error if incorrect query provided",
+                AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE,status_code)
+        request["query"] = "{\"email\":\"none\"}"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        status_code = AdminControllerRequestResults.valueOf(response["status_code"].toString())
+        assertEquals("Should return object not found error if incorrect search value provided",
+                AdminControllerRequestResults.RESULT_ERROR_OBJECT_NOT_FOUND,status_code)
+        request["query"] = "{\"login\":\"arnold\"}"
+        ws_session.remote.sendString(toJSONString(request))
+        Thread.sleep(500)
+        response = parser.parse(this.webSocketResponse) as JSONObject
+        assertNotNull("Should contain user object in case of success",response["user"])
+        val user = toJSONObject(response["user"])!!
+        assertNull("Should not contain password field",user["password"])
+        assertEquals("Should contain correct _id field","1",user["_id"])
+    }
 }

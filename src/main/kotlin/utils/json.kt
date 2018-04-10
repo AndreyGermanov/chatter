@@ -111,7 +111,7 @@ fun toJSONObject(field_object:Any?):JSONObject? {
         try {
             field = parser.parse(field_object.toString()) as JSONObject
         } catch (e:Exception) {
-            Logger.log(LogLevel.WARNING,"Could not parse field $field_object to JSON.",
+            Logger.log(LogLevel.WARNING,"Could not parse field $field_object to JSONObject.",
                     "top","toJSONObject")
         }
     } else if (field_object !is JSONObject) {
@@ -121,6 +121,23 @@ fun toJSONObject(field_object:Any?):JSONObject? {
         field = field_object
     }
     return field
+}
+
+/**
+ * Function converts JSONObject of format {key:value} to Pair<String,String>
+ *
+ * @param obj - JSONObject to convert
+ * @return Pair<String,String> or null, if impossible to convert
+ */
+fun JSONToPair(obj:JSONObject):Pair<String,String>? {
+    if (obj.count()!=1) {
+        Logger.log(LogLevel.WARNING,"Incorrect JSON object format. Object: $obj", "top","JSONToPair")
+        return null
+    }
+    for ((index,value) in obj) {
+        return index.toString() to value.toString()
+    }
+    return null
 }
 
 enum class JSONParseResult(val value:String) {

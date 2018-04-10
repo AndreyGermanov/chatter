@@ -66,7 +66,66 @@ enum class AdminController(val value:String): WebSocketController {
     /**
      * Action used to get single user record by field name or value
      */
-    admin_get_user("admin_get_user"),
+    admin_get_user("admin_get_user") {
+        /**
+         * Action executor
+         *
+         * @param request: Request body. Should contain "query" param, which is JSONObject in form of
+         * {field_name:field_value} which identifies, which user to return. Only first user which meet this
+         * condition returned
+         * @param session: Link to WebSocket client session instance
+         * @return response, with results of operation. Contains fields:
+         *  'status' = "error" in case of error, and "ok" in case if "ok"
+         *  'status_code' - description of error as AdminControllerRequestResults enumeration value
+         *  'user' - if success, here is JSONObject with user data
+         */
+        override fun exec(request:JSONObject,session:Session?):JSONObject {
+            val logInfo = "Username: $username,Remote IP: $sessionIP. Request: $request"
+            Logger.log(LogLevel.DEBUG,"Begin admin_get_user_request. " +
+                    "$logInfo", "AdminController","admin_get_user.exec")
+            var response = JSONObject()
+            var condition_json = toJSONObject(request["query"])
+            response["status"] = "error"
+            response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
+            response["field"] = "query"
+            if (condition_json == null) {
+                Logger.log(LogLevel.WARNING,"Could not parse 'query' to JSON. Query: ${request["query"]}. $logInfo",
+                        "AdminController","admin_get_user.exec")
+                return response
+            }
+            var condition = JSONToPair(condition_json)
+            if (condition == null) {
+                Logger.log(LogLevel.WARNING,"Incorrect query format. Query: $condition_json. $logInfo",
+                        "AdminController","admin_get_user.exec")
+                return response
+            }
+            if (!ChatApplication.users.schema.containsKey(condition.first)) {
+                Logger.log(LogLevel.WARNING,"Incorrect field name in query. Field: ${condition.first}. " +
+                        "Query: $condition_json. $logInfo", "AdminController","admin_get_user.exec")
+                response["field"] = condition.first
+                return response
+            }
+            val user = ChatApplication.users.getBy(condition.first,condition.second)
+            if (user == null || user !is User) {
+                Logger.log(LogLevel.WARNING,"User not found. Condition: ${condition}. " +
+                        "Query: $condition_json. $logInfo", "AdminController","admin_get_user.exec")
+                response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_OBJECT_NOT_FOUND
+                return response
+            }
+            Logger.log(LogLevel.WARNING,"User not found. Condition: ${condition}. " +
+                    "Query: $condition_json. $logInfo", "AdminController","admin_get_user.exec")
+            response["status"] = "ok"
+            response["status_code"] = AdminControllerRequestResults.RESULT_OK
+            val user_json = user.toJSON()
+            if (user_json.containsKey("password")) {
+                user_json.remove("password")
+            }
+            response["user"] = user_json
+            Logger.log(LogLevel.DEBUG,"admin_get_user_request finished successfully. User: ${response["user"]}. " +
+                    "Query: $condition_json. $logInfo", "AdminController","admin_get_user.exec")
+            return response
+        }
+    },
     /**
      * Action used to create new user.
      */
