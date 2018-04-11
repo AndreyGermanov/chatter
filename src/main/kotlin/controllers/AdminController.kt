@@ -193,7 +193,7 @@ enum class AdminController(val value:String): WebSocketController {
          */
         override fun exec(request:JSONObject,session:Session?):JSONObject {
             val logInfo = "Username: $username,Remote IP: $sessionIP. Request: $request"
-            Logger.log(LogLevel.DEBUG,"Begin admin_add_user request handler. $logInfo",
+            Logger.log(LogLevel.DEBUG,"Begin admin_update_user request handler. $logInfo",
                     "AdminController","admin_update_user.exec")
             var response = JSONObject()
             var fields:JSONArray?
@@ -216,13 +216,13 @@ enum class AdminController(val value:String): WebSocketController {
             }
             user_id = request["id"].toString()
             Logger.log(LogLevel.DEBUG,"Begin fields validation for fields: $fields. $logInfo",
-                    "AdminController","admin_add_user.exec")
+                    "AdminController","admin_update_user.exec")
             val result = this.validateFields(fields,user_id)
             if (result is JSONObject) {
                 Logger.log(LogLevel.WARNING,"Errors during fields validation: $fields. $logInfo",
                         "AdminController","admin_update_user.exec")
                 return result
-            } else if (result is User ) {
+            } else if (result is User) {
                 Logger.log(LogLevel.DEBUG, "Fields validated successfully. Returned object: $user. $logInfo",
                         "AdminController", "admin_update_user.exec")
                 result.save {}
@@ -681,7 +681,7 @@ enum class AdminController(val value:String): WebSocketController {
     open fun validateFields(fields:JSONArray,id:String?=null):Any {
         val logInfo = "Username: $username,Remote IP: $sessionIP."
         Logger.log(LogLevel.DEBUG,"Validating fields: $fields. " +
-                " $logInfo","AdminController","admin_get_user.validateFields")
+                " $logInfo","AdminController","validateFields")
         var error = JSONObject()
         var initial_user:User?
         var initial_login:String? = null
@@ -692,7 +692,7 @@ enum class AdminController(val value:String): WebSocketController {
             initial_user = ChatApplication.users.getById(id) as? User
             if (initial_user == null) {
                 Logger.log(LogLevel.WARNING,"User with specified ID $id not found. Fields: $fields. $logInfo",
-                        "AdminController","admin_get_user.validateFields")
+                        "AdminController","validateFields")
                 error["status"] = "error"
                 error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_OBJECT_NOT_FOUND
                 error["field"] = "id"
@@ -705,7 +705,7 @@ enum class AdminController(val value:String): WebSocketController {
         val user = this.createModel(initial_user,fields)
         if (user["login"] == null) {
             Logger.log(LogLevel.WARNING,"'login' field is required. Fields: $fields. $logInfo",
-                    "AdminController","admin_get_user.validateFields")
+                    "AdminController","validateFields")
             error["status"] = "error"
             error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
             error["field"] = "login"
@@ -713,7 +713,7 @@ enum class AdminController(val value:String): WebSocketController {
         }
         if (user["email"] == null) {
             Logger.log(LogLevel.WARNING,"'email' field is required. Fields: $fields. $logInfo",
-                    "AdminController","admin_get_user.validateFields")
+                    "AdminController","validateFields")
             error["status"] = "error"
             error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
             error["field"] = "email"
@@ -722,7 +722,7 @@ enum class AdminController(val value:String): WebSocketController {
         }
         if (user["default_room"]==null) {
             Logger.log(LogLevel.WARNING,"'default_room' field is required. Fields: $fields. $logInfo",
-                    "AdminController","admin_get_user.validateFields")
+                    "AdminController","validateFields")
             error["status"] = "error"
             error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
             error["field"] = "default_room"
@@ -731,7 +731,7 @@ enum class AdminController(val value:String): WebSocketController {
         if (ChatApplication.users.getBy("login",user["login"].toString()) != null) {
             if (initial_login == null || initial_login != user["login"].toString()) {
                 Logger.log(LogLevel.WARNING, "Model with provided 'login'=${user["login"]} already exists in database: " +
-                        "$fields. $logInfo", "AdminController", "admin_get_user.validateFields")
+                        "$fields. $logInfo", "AdminController", "validateFields")
                 error["status"] = "error"
                 error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_ALREADY_EXISTS
                 error["field"] = "login"
@@ -740,7 +740,7 @@ enum class AdminController(val value:String): WebSocketController {
         }
         if (!isValidEmail(user["email"].toString())) {
             Logger.log(LogLevel.WARNING,"Invalid email format 'email'=${user["email"]} " +
-                    "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                    "$fields. $logInfo","AdminController","validateFields")
             error["status"] = "error"
             error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
             error["field"] = "email"
@@ -749,7 +749,7 @@ enum class AdminController(val value:String): WebSocketController {
         if (ChatApplication.users.getBy("email",user["email"].toString()) != null) {
             if (initial_email == null || initial_email != user["email"].toString()) {
                 Logger.log(LogLevel.WARNING, "Model with provided 'email'=${user["email"]} already exists in database: " +
-                        "$fields. $logInfo", "AdminController", "admin_get_user.validateFields")
+                        "$fields. $logInfo", "AdminController", "validateFields")
                 error["status"] = "error"
                 error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_ALREADY_EXISTS
                 error["field"] = "email"
@@ -758,7 +758,7 @@ enum class AdminController(val value:String): WebSocketController {
         }
         if (ChatApplication.rooms.getById(user["default_room"].toString())==null) {
             Logger.log(LogLevel.WARNING,"Provided default room ='${user["default_room"]}' does not exist." +
-                    "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                    "$fields. $logInfo","AdminController","validateFields")
             error["status"] = "error"
             error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
             error["field"] = "default_room"
@@ -768,7 +768,7 @@ enum class AdminController(val value:String): WebSocketController {
             val birthDate = user["birthDate"].toString().toInt()
             if (birthDate<0 || birthDate>(System.currentTimeMillis()/1000).toInt()) {
                 Logger.log(LogLevel.WARNING,"Incorrect birthDate='$birthDate' " +
-                        "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                        "$fields. $logInfo","AdminController","validateFields")
                 error["status"] = "error"
                 error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
                 error["field"] = "birthDate"
@@ -778,7 +778,7 @@ enum class AdminController(val value:String): WebSocketController {
         if (user["gender"]!=null) {
             if (user["gender"].toString()!="M" && user["gender"].toString()!="F") {
                 Logger.log(LogLevel.WARNING, "Incorrect gender='${user["gender"]}' " +
-                        "$fields. $logInfo", "AdminController", "admin_get_user.validateFields")
+                        "$fields. $logInfo", "AdminController", "validateFields")
                 error["status"] = "error"
                 error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
                 error["field"] = "gender"
@@ -789,7 +789,7 @@ enum class AdminController(val value:String): WebSocketController {
             val role = user["role"].toString().toInt()
             if (role!=1 && role!=2) {
                 Logger.log(LogLevel.WARNING,"Incorrect role='${user["role"]}' " +
-                        "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                        "$fields. $logInfo","AdminController","validateFields")
                 error["status"] = "error"
                 error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
                 error["field"] = "role"
@@ -801,8 +801,8 @@ enum class AdminController(val value:String): WebSocketController {
         if (user["password"] != null) {
             val password = user["password"].toString().trim()
             if (password.isEmpty()) {
-                Logger.log(LogLevel.WARNING,"Password should no be empty" +
-                        "$fields. $logInfo","AdminController","admin_get_user.validateFields")
+                Logger.log(LogLevel.WARNING,"Password should not be empty" +
+                        "$fields. $logInfo","AdminController","validateFields")
                 error["status"] = "error"
                 error["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
                 error["field"] = "password"
@@ -821,7 +821,7 @@ enum class AdminController(val value:String): WebSocketController {
             user["active"] = false
         }
         Logger.log(LogLevel.DEBUG,"No validation errors during validation. Object constructed: $user. " +
-                " $logInfo","AdminController","admin_get_user.validateFields")
+                " $logInfo","AdminController","validateFields")
         var model = User(ChatApplication.dBServer.db,"users")
         model.doc = Document.parse(toJSONString(user))
         return model

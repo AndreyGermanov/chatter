@@ -149,26 +149,48 @@ enum class UserController(val value:String): WebSocketController {
         Logger.log(LogLevel.DEBUG,"Authentication on enter UserController started." +
                 "Remote IP: $sessionIP.","UserController","auth")
         if (!request.containsKey("user_id") || MessageCenter.app.users.getById(request.get("user_id").toString()) == null) {
+            Logger.log(LogLevel.WARNING,"Authentication error. User_id not found in request." +
+                    "Remote IP: $sessionIP.","UserController","auth")
             response.set("status","error")
             response.set("status_code", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR)
             response.set("message", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
             return response
         }
         if (!request.containsKey("session_id") || MessageCenter.app.sessions.getById(request.get("session_id").toString()) == null) {
+            Logger.log(LogLevel.WARNING,"Authentication error. Session_id not found in request." +
+                    "Remote IP: $sessionIP.","UserController","auth")
             response.set("status","error")
             response.set("status_code", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR)
             response.set("message", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
             return response
         }
+        val user = MessageCenter.app.users.getById(request["user_id"].toString()) as models.User
+        val username = user["login"].toString()
         val user_session = MessageCenter.app.sessions.getById(request.get("session_id").toString()) as models.Session
         if (user_session["user_id"] != request.get("user_id").toString()) {
+            Logger.log(LogLevel.WARNING,"Authentication error. Session_id does not belong to User_id." +
+                    "Remote IP: $sessionIP.","UserController","auth")
+            response.set("status","error")
+            response.set("status_code", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR)
+            response.set("message", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
+            return response
+        }
+        val currentTime = (System.currentTimeMillis()/1000).toInt()
+        val lastActivityTime = user_session["lastActivityTime"].toString().toInt()
+        if (currentTime-lastActivityTime>MessageCenter.SESSION_TIMEOUT) {
+            Logger.log(LogLevel.WARNING,"Authentication error. Session timeout." +
+                    "Username: $username,Remote IP: $sessionIP.","UserController","auth")
             response.set("status","error")
             response.set("status_code", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR)
             response.set("message", MessageCenter.MessageObjectResponseCodes.AUTHENTICATION_ERROR.getMessage())
             return response
         }
         Logger.log(LogLevel.DEBUG,"Authentication on enter UserController passed successfully." +
-                "Remote IP: $sessionIP.","UserController","auth")
+                "Username: $username, Remote IP: $sessionIP.","UserController","auth")
+        user_session["lastActivityTime"] = currentTime
+        user_session.save {}
+        Logger.log(LogLevel.DEBUG,"Updated user last activity time to current timestamp $currentTime." +
+                "Username: $username, Remote IP: $sessionIP.","UserController","auth")
         return null
     }
 

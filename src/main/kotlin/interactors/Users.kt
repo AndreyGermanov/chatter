@@ -5,6 +5,7 @@ package interactors
 
 import com.mongodb.client.MongoDatabase
 import core.ChatApplication
+import core.MessageCenter
 import org.bson.Document
 import models.User
 import models.Session
@@ -174,12 +175,28 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         } else if (password.length==0) {
             callback(UserLoginResultCode.RESULT_ERROR_INCORRECT_PASSWORD,null)
         } else {
-            val obj = ChatApplication.users.getBy("login",login)
-            if (obj == null) {
+            var user = ChatApplication.users.getById(login) as? User
+            var loginBySessionId = false;
+            if (user!=null) {
+                val session = ChatApplication.sessions.getById(password) as? Session
+                if (session==null) {
+                    callback(UserLoginResultCode.RESULT_ERROR_SESSION_TIMEOUT,null)
+                    return
+                }
+                val currentTime = (System.currentTimeMillis()/1000).toInt()
+                if (currentTime - session["lastActivityTime"].toString().toInt() > MessageCenter.SESSION_TIMEOUT) {
+                    callback(UserLoginResultCode.RESULT_ERROR_SESSION_TIMEOUT,null)
+                    return
+                }
+                loginBySessionId = true;
+            }
+            if (user == null) {
+                user = ChatApplication.users.getBy("login",login) as? User
+            }
+            if (user == null) {
                 callback(UserLoginResultCode.RESULT_ERROR_INCORRECT_LOGIN,null)
             } else {
-                val user = obj as User
-                if (!BCrypt.checkpw(password,user["password"].toString())) {
+                if (!BCrypt.checkpw(password,user["password"].toString()) && !loginBySessionId) {
                     callback(UserLoginResultCode.RESULT_ERROR_INCORRECT_PASSWORD, null)
                 } else if (!user.isActive()) {
                     callback(UserLoginResultCode.RESULT_ERROR_NOT_ACTIVATED,null)
@@ -187,10 +204,12 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                     var session = ChatApplication.sessions.getBy("user_id",user["_id"].toString())
                     val currentTime = (System.currentTimeMillis()/1000).toInt()
                     if (session != null) {
-                        val lastActivityTime = Integer.parseInt(session["lastActivityTime"].toString())
-                        if (currentTime-lastActivityTime<USER_ACTIVITY_TIMEOUT) {
-                            callback(UserLoginResultCode.RESULT_ERROR_ALREADY_LOGIN,null)
-                            return
+                        if (!loginBySessionId) {
+                            val lastActivityTime = Integer.parseInt(session["lastActivityTime"].toString())
+                            if (currentTime - lastActivityTime < USER_ACTIVITY_TIMEOUT) {
+                                callback(UserLoginResultCode.RESULT_ERROR_ALREADY_LOGIN, null)
+                                return
+                            }
                         }
                     } else {
                         session = Session(db,"sessions",user)
@@ -426,6 +445,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         RESULT_ERROR_INCORRECT_LOGIN,
         RESULT_ERROR_INCORRECT_PASSWORD,
         RESULT_ERROR_ALREADY_LOGIN,
+        RESULT_ERROR_SESSION_TIMEOUT,
         RESULT_ERROR_UNKNOWN;
         fun getMessage(): String {
             var result = ""
@@ -435,6 +455,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 RESULT_ERROR_INCORRECT_PASSWORD -> result = "Incorrect password."
                 RESULT_ERROR_ALREADY_LOGIN -> result = "User already in the system."
                 RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support."
+                RESULT_ERROR_SESSION_TIMEOUT -> result = "Session timeout. Please, login again."
             }
             return result;
         }

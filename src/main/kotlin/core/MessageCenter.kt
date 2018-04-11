@@ -42,6 +42,7 @@ import utils.LogLevel
  * @property remoteSession Link to established connection session with remote WebSocket client
  * @property msgCenter Link to owner MessageCenter
  * @property lastResponse Last response sent to remote client
+ * @property sessionTimeout: Timeout of user session in seconds. In case of inactivity, user must login again
  * to be removed by cleanup cronjob
  */
 object MessageCenter {
@@ -53,6 +54,7 @@ object MessageCenter {
     var PENDING_REQUEST_TIMEOUT = 10
     var lastResponse:String = ""
     var remoteSession: Session? = null
+    var SESSION_TIMEOUT = 10
 
     /** Timer task class, which used to run cronjob for cleanup
      *  pending file requests queue
@@ -126,7 +128,7 @@ object MessageCenter {
         val srv: Javalin = ChatApplication.webServer
         var pol = WebSocketPolicy.newServerPolicy()
         pol.maxBinaryMessageSize = 9999999
-        Logger.log(LogLevel.DEBUG,"Setup Message Center","MessageCenter","init")
+        Logger.log(LogLevel.DEBUG,"Setup Message Center","MessageCenter","setup")
         srv.ws("/websocket", MessageObject())
 
         /**
@@ -311,12 +313,14 @@ object MessageCenter {
      */
     enum class MessageObjectResponseCodes {
         INTERNAL_ERROR,
-        AUTHENTICATION_ERROR;
+        AUTHENTICATION_ERROR,
+        SESSION_TIMEOUT_ERROR;
         fun getMessage():String {
             var result = ""
             when(this) {
                 INTERNAL_ERROR -> result = "Internal Error"
                 AUTHENTICATION_ERROR -> result = "Authentication Error"
+                SESSION_TIMEOUT_ERROR -> result = "Session timeout. Please, login again"
             }
             return result
         }
