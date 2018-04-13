@@ -54,7 +54,7 @@ object MessageCenter {
     var PENDING_REQUEST_TIMEOUT = 10
     var lastResponse:String = ""
     var remoteSession: Session? = null
-    var SESSION_TIMEOUT = 10
+    var SESSION_TIMEOUT = 3600
 
     /** Timer task class, which used to run cronjob for cleanup
      *  pending file requests queue

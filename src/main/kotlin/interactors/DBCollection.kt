@@ -146,6 +146,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
                     if (it[field] != null && (fields==null || fields!!.contains(field))) {
                         if (it[field].toString().toLowerCase().startsWith(filter,true)) {
                             results.add(it)
+                            break
                         }
                     }
                 }
@@ -269,7 +270,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             val jsonObj = JSONObject()
             val model = modelObj as DBModel
             for ((field_index,_) in schema) {
-                if (model[field_index]!=null && (fields==null || fields.contains(field_index))) {
+                if (model[field_index]!=null && (fields==null || fields.contains(field_index)) && field_index!="password") {
                     jsonObj[field_index] = model[field_index]
                 }
             }
