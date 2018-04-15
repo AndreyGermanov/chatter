@@ -120,6 +120,12 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      *          limit: number of records to return . If not specified, all records returned
      *          sort: field used for sorting. It is a pair of "field" to (DESC or ASC).
      *          If not specified, natural sorting used, as loaded from database
+     *          get_total: if specified, then result will include total number of items in collection
+     *          after applying filter (but before applying offset and limit). Total value will be returned as last
+     *          item of array
+     *          get_presentations: if specified, will use field presentations if field string presentation for field
+     *          differs from real database value . In this case "filter" will be applied to presentation of field,
+     *          not to actual field value
      * @return ArrayList with all models, which meet criteria
     */
     fun getList(params:JSONObject?=null):ArrayList<Any> {
@@ -127,6 +133,8 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
         var fields:ArrayList<String>? = null
         var limit = 0
         var offset = 0
+        var getTotal = false
+        var getPresentations = false
         var sort:Pair<String,String>? = null
         if (params!=null) {
             filter = params["filter"]?.toString() ?: ""
@@ -138,13 +146,22 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             if (params["sort"] is Pair<*,*>) {
                 sort = params["sort"] as Pair<String, String>
             }
+            getTotal = params["get_total"] != null
+            getPresentations = params["get_presentations"] != null
         }
         var results = ArrayList<Any>()
         if (!filter.isEmpty()) {
             this.models.map { it as DBModel }.forEach {
                 for ((field,_) in schema) {
                     if (it[field] != null && (fields==null || fields!!.contains(field))) {
-                        if (it[field].toString().toLowerCase().startsWith(filter,true)) {
+                        if (field == "_id") {
+                            continue
+                        }
+                        var fieldValue = it[field].toString().toLowerCase()
+                        if (getPresentations) {
+                            fieldValue = getFieldPresentation(it,field).toLowerCase()
+                        }
+                        if (fieldValue.startsWith(filter,true)) {
                             results.add(it)
                             break
                         }
@@ -155,95 +172,28 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             results.addAll(this.models)
         }
         if (sort!=null && schema[sort.first]!=null) {
-            var sortField = sort.first
-            var sortType = schema[sort.first].toString()
-            var corrector = 1
-            if (sort.second == "DESC") {
-                corrector = -1
-            }
-            results.sortWith(Comparator<Any> { p1, p2 ->
-                val p1 = p1 as DBModel
-                val p2 = p2 as DBModel
-                when (sortType) {
-                    "Double" -> {
-                        var v1 = 0.0
-                        var v2 = 0.0
-                        try {
-                            v1 = p1[sortField]?.toString()?.toDouble() ?: 0.0
-                            v2 = p2[sortField]?.toString()?.toDouble() ?: 0.0
-                        } catch (e:Exception) {
-                            Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Double " +
-                                    "for sorting: ${p1[sortField]},${p2[sortField]}","DBCollection","getList")
-                        }
-                        if (v1>v2) {
-                            1*corrector
-                        } else if (v1<v2) {
-                            -1*corrector
-                        } else {
-                            0
-                        }
-                    }
-                    "Int" -> {
-                        var v1 = 0
-                        var v2 = 0
-                        try {
-                            v1 = p1[sortField]?.toString()?.toInt() ?: 0
-                            v2 = p2[sortField]?.toString()?.toInt() ?: 0
-                        } catch (e:Exception) {
-                            Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Int " +
-                                    "for sorting: ${p1[sortField]},${p2[sortField]}","DBCollection","getList")
-                        }
-                        if (v1>v2) {
-                            1*corrector
-                        } else if (v1<v2) {
-                            -1*corrector
-                        } else {
-                            0
-                        }
-                    }
-                    "Boolean" -> {
-                        var v1 = false
-                        var v2 = false
-                        try {
-                            v1 = p1[sortField].toString()?.toBoolean() ?: false
-                            v2 = p2[sortField].toString()?.toBoolean() ?: false
-                        } catch (e:Exception) {
-                            Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Boolean " +
-                                    "for sorting: ${p1[sortField]},${p2[sortField]}","DBCollection","getList")
-                        }
-                        if (v1>v2) {
-                            1*corrector
-                        } else if (v1<v2) {
-                            -1*corrector
-                        } else {
-                            0
-                        }
-                    }
-                    else -> {
-                        var v1 = p1[sortField]?.toString()?.toLowerCase() ?: ""
-                        var v2 = p2[sortField]?.toString()?.toLowerCase() ?: ""
-                        if (v1>v2) {
-                            1*corrector
-                        } else if (v1<v2) {
-                            -1*corrector
-                        } else {
-                            0
-                        }
-                    }
-                }
+            results.sortWith(Comparator<Any> { obj1, obj2 ->
+                getSortOrder(obj1,obj2,sort!!) ?: 0
             })
         }
+        val count = results.size
         if (offset>0 || limit>0) {
             var endIndex = offset+limit
-            if (endIndex == 0 || endIndex>results.size) {
+            if (endIndex == 0 || endIndex>results.size || limit == 0) {
                 endIndex = results.size
             }
             var sublist = results.subList(offset,endIndex)
             if (sublist.count()>0) {
                 var subListArray = ArrayList<Any>()
                 subListArray.addAll(sublist)
+                if (getTotal) {
+                    subListArray.add(count)
+                }
                 return subListArray
             }
+        }
+        if (getTotal) {
+            results.add(count)
         }
         return results
     }
@@ -257,21 +207,45 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      *          limit: number of records to return . If not specified, all records returned
      *          sort: field used for sorting. It is a pair of "field" to (DESC or ASC).
      *          If not specified, natural sorting used, as loaded from database
+     *          get_total: if specified, then result will include total number of items in collection
+     *          after applying filter (but before applying offset and limit). Total value will be returned as last
+     *          item of array
+     *          get_presentations: if specified, will use field presentations if field string presentation for field
+     *          differs from real database value . In this case "filter" will be applied to presentation of field,
+     *          not to actual field value. Also, it will add additional fields to result in a form "<field_id>_text"
+     *          for all fields, which string presentation differs from actual database value
      * @return JSONArray with all models, which meet criteria
      */
     fun getListJSON(params:JSONObject?=null):JSONArray {
         val results = JSONArray()
         val models = this.getList(params)
         var fields:ArrayList<String>? = null
-        if (params !=null && params["fields"]!=null) {
+        var getPresentations = false
+        if (params !=null) {
             fields = params["fields"] as? ArrayList<String>
+            getPresentations = params["get_presentations"] != null
         }
         for (modelObj in models) {
             val jsonObj = JSONObject()
-            val model = modelObj as DBModel
+            val model = modelObj as? DBModel
+            if (model==null) {
+                var count = 0
+                try {
+                    count = modelObj.toString().toInt()
+                    results.add(count)
+                } catch (e: Exception) {
+                    Logger.log(LogLevel.WARNING,"Could not parse row from returned users list: $modelObj",
+                            "DBCollection","getListJSON")
+                }
+                continue
+            }
             for ((field_index,_) in schema) {
                 if (model[field_index]!=null && (fields==null || fields.contains(field_index)) && field_index!="password") {
+                    var field_presentation = getFieldPresentation(model,field_index)
                     jsonObj[field_index] = model[field_index]
+                    if (getPresentations && field_presentation != model[field_index].toString())  {
+                        jsonObj[field_index+"_text"] = field_presentation
+                    }
                 }
             }
             if (jsonObj.count()>0) {
@@ -282,6 +256,130 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             }
         }
         return results
+    }
+
+    /**
+     * Function calculates string representation of field with provided [field_id]
+     * of provided [model]
+     *
+     * @param obj: Model from which need to get field
+     * @param field_id: ID of field which need to extract and get representation
+     * @return Human readable string representation of field value
+     */
+    open fun getFieldPresentation(obj: Any,field_id:String):String {
+        var model = obj as? DBModel
+        if (model == null) {
+            Logger.log(LogLevel.WARNING, "Could not convert object to model to get text representation " +
+                    "for field '$field_id'", "DBCollection","getFieldPresentation")
+            return ""
+        }
+        if (model[field_id]==null) {
+            Logger.log(LogLevel.WARNING, "Field with ID '$field_id' does not exist in $model",
+                    "DBCollection","getFieldPresentation")
+            return ""
+        }
+        return model[field_id].toString()
+    }
+
+    /**
+     * Function calculates sort order for models [model1] and [model2] when sorting using [sort_order] param
+     *
+     * @param model1: First model
+     * @param model2: Second model
+     * @param sortOrder: Pair<String,String> which contains sorting rule. First part is field_id,second part is
+     * sort direction: ASC or DESC
+     * @returns When sort order is ASC, returns 1 if obj1>obj2, -1 if obj1<obj2 and 0 if they are equals
+     *          When sort order is DESC, returns 1 if obj1<obj2, -1 if obj1>obj2 and 0 if they are equals
+     *          Else returns null in case of error during operation
+     */
+    open fun getSortOrder(obj1:Any, obj2:Any,sortOrder:Pair<String,String>): Int? {
+        var model1 = obj1 as? DBModel
+        var model2 = obj2 as? DBModel
+        if (model1 == null) {
+            Logger.log(LogLevel.WARNING,"Object 1 ($obj1) is not correct database model",
+                    "DBCollection","getSortOrder")
+            return null
+        }
+        if (model2 == null) {
+            Logger.log(LogLevel.WARNING,"Object 2 ($obj2) is not correct database model",
+                    "DBCollection","getSortOrder")
+            return null
+        }
+        var sortField = sortOrder.first
+        var sortType = schema[sortOrder.first].toString()
+        var corrector = 1
+        if (sortOrder.second == "DESC") {
+            corrector = -1
+        }
+        var result = 0
+        when (sortType) {
+            "Double" -> {
+                var v1 = 0.0
+                var v2 = 0.0
+                try {
+                    v1 = model1[sortField]?.toString()?.toDouble() ?: 0.0
+                    v2 = model2[sortField]?.toString()?.toDouble() ?: 0.0
+                } catch (e:Exception) {
+                    Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Double " +
+                            "for sorting: ${model1[sortField]},${model2[sortField]}","DBCollection","getSortOrder")
+                }
+                if (v1>v2) {
+                    result = 1*corrector
+                } else if (v1<v2) {
+                    result = -1*corrector
+                } else {
+                    result = 0
+                }
+            }
+            "Int" -> {
+                var v1 = 0
+                var v2 = 0
+                try {
+                    v1 = model1[sortField]?.toString()?.toInt() ?: 0
+                    v2 = model2[sortField]?.toString()?.toInt() ?: 0
+                } catch (e:Exception) {
+                    Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Int " +
+                            "for sorting: ${model1[sortField]},${model2[sortField]}","DBCollection","getList")
+                }
+                if (v1>v2) {
+                    result = 1*corrector
+                } else if (v1<v2) {
+                    result = -1*corrector
+                } else {
+                    result = 0
+                }
+            }
+            "Boolean" -> {
+                var v1 = false
+                var v2 = false
+                try {
+                    v1 = model1[sortField].toString()?.toBoolean() ?: false
+                    v2 = model2[sortField].toString()?.toBoolean() ?: false
+                } catch (e:Exception) {
+                    Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Boolean " +
+                            "for sorting: ${model1[sortField]},${model2[sortField]}","DBCollection","getList")
+                }
+                if (v1>v2) {
+                    result = 1*corrector
+                } else if (v1<v2) {
+                    result = -1*corrector
+                } else {
+                    result = 0
+                }
+            }
+            else -> {
+                var v1 = model1[sortField]?.toString()?.toLowerCase() ?: ""
+                var v2 = model2[sortField]?.toString()?.toLowerCase() ?: ""
+                if (v1>v2) {
+                    result =1*corrector
+                } else if (v1<v2) {
+                    result = -1*corrector
+                } else {
+                    result = 0
+                }
+            }
+        }
+        return result
     }
 
     /**

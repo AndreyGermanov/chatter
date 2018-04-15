@@ -138,8 +138,12 @@ open class DBModel(db:MongoDatabase,colName:String) {
         }
         val items = collection.getList()
         if (items.filter {
-            val obj = it as DBModel
-            obj["_id"] == this["_id"]
+            val obj = it as? DBModel
+                    if (obj == null) {
+                        false
+                    } else {
+                        obj["_id"] == this["_id"]
+                    }
         }.count()==0) {
             collection.addModel(this)
         }

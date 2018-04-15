@@ -6,6 +6,7 @@ package interactors
 import com.mongodb.client.MongoDatabase
 import core.ChatApplication
 import core.MessageCenter
+import models.Room
 import org.bson.Document
 import models.User
 import models.Session
@@ -373,6 +374,153 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 app.sessions.remove(session["_id"].toString()){}
             }
             result++
+        }
+        return result
+    }
+
+    /**
+     * Function calculates string representation of field with provided [field_id]
+     * of provided [model]
+     *
+     * @param model: Model from which need to get field
+     * @param field_id: ID of field which need to extract and get representation
+     * @return Human readable string representation of field value
+     */
+    override fun getFieldPresentation(obj:Any,field_id:String): String {
+        val model = obj as? User
+        if (model == null) {
+            Logger.log(LogLevel.WARNING, "Could not convert object to model to get text presentation " +
+                    "for field '$field_id'", "Users","getFieldPresentation")
+            return super.getFieldPresentation(obj, field_id)
+        }
+        if (model[field_id] == null) {
+            Logger.log(LogLevel.WARNING, "Could not find '$field_id' field in 'User' model " +
+                    "for field '$field_id'", "Users","getFieldPresentation")
+            return ""
+
+        }
+        if (field_id == "default_room") {
+            val room = ChatApplication.rooms.getById(model["default_room"].toString()) as? Room
+            if (room == null) {
+                Logger.log(LogLevel.WARNING, "Could not find room to get presentation for 'default_room' " +
+                        "field", "Users","getFieldPresentation")
+                return ""
+
+            }
+            return room["name"].toString()
+        }
+        if (field_id == "active") {
+            val active = model["active"] as? Boolean
+            if (active == null || !active) {
+                return "Inactive"
+            } else {
+                return "Active"
+            }
+        }
+        if (field_id == "role") {
+            var role = 1
+            try {
+                role = model["role"].toString().toInt()
+            } catch (e:Exception) {
+                Logger.log(LogLevel.WARNING, "Could not convert 'role' field value to Integer from " +
+                        "'${model["role"]}' ", "Users","getFieldPresentation")
+            }
+            if (role == 1) {
+                return "User"
+            } else if (role == 2) {
+                return "Admin"
+            } else {
+                return "User"
+            }
+        }
+        if (field_id == "birthDate") {
+            var birthDate:Long = 0
+            try {
+                birthDate = model["birthDate"].toString().toLong()
+            } catch (e:Exception) {
+                Logger.log(LogLevel.WARNING, "Could not convert 'birthDate' field value to Long from " +
+                        "'${model["birthDate"]}' ", "Users","getFieldPresentation")
+                return ""
+            }
+            if (birthDate<=0 || birthDate > System.currentTimeMillis()/1000) {
+                Logger.log(LogLevel.WARNING, "Could not convert 'birthDate' field value to correct date from " +
+                        "'${model["birthDate"]}' ", "Users","getFieldPresentation")
+                return ""
+            }
+            return Logger.formatDate(Date(birthDate))
+        }
+        if (field_id == "gender") {
+            val gender = model["gender"].toString()
+            if (gender == "M") {
+                return "Male"
+            } else if (gender == "F") {
+                return "Female"
+            } else {
+                return ""
+            }
+        }
+        return super.getFieldPresentation(obj, field_id)
+    }
+
+    /**
+     * Function calculates sort order for models [obj1] and [obj2] when sorting using [sortOrder] param
+     *
+     * @param obj1: First model
+     * @param obj2: Second model
+     * @param sortOrder: Pair<String,String> which contains sorting rule. First part is field_id,second part is
+     * sort direction: ASC or DESC
+     * @returns When sort order is ASC, returns 1 if obj1>obj2, -1 if obj1<obj2 and 0 if they are equals
+     *          When sort order is DESC, returns 1 if obj1<obj2, -1 if obj1>obj2 and 0 if they are equals
+     *          Else returns null in case of error during operation
+     */
+    override fun getSortOrder(obj1:Any, obj2:Any,sortOrder:Pair<String,String>): Int? {
+        var result = super.getSortOrder(obj1, obj2, sortOrder)
+        if (result == null) {
+            return result
+        }
+        val model1 = obj1 as? User
+        val model2 = obj2 as? User
+        if (model1 == null) {
+            Logger.log(LogLevel.WARNING,"Object 1 ($obj1) is not correct User model",
+                    "Users","getSortOrder")
+            return null
+        }
+        if (model2 == null) {
+            Logger.log(LogLevel.WARNING,"Object 2 ($obj2) is not correct User model",
+                    "Users","getSortOrder")
+            return null
+        }
+        var corrector = 1
+        if (sortOrder.second == "DESC") {
+            corrector = -1
+        }
+        when (sortOrder.first) {
+            "default_room" -> {
+                val room1_name = (ChatApplication.rooms.getById(
+                        model1["default_room"]?.toString() ?: "") as? Room)?.get("name")?.toString()
+                        ?: ""
+                val room2_name = (ChatApplication.rooms.getById(
+                        model2["default_room"]?.toString() ?: "") as? Room)?.get("name")?.toString()
+                        ?: ""
+                if (room1_name>room2_name) {
+                    result = 1*corrector
+                } else if (room1_name<room2_name) {
+                    result = -1*corrector
+                } else {
+                    result = 0
+                }
+            }
+            "active", "role" -> {
+                val v1 = getFieldPresentation(model1,sortOrder.first)
+                val v2 = getFieldPresentation(model2,sortOrder.first)
+                if (v1>v2) {
+                    result = 1*corrector
+                } else if (v1<v2) {
+                    result = -1*corrector
+                } else {
+                    result = 0
+                }
+            }
         }
         return result
     }

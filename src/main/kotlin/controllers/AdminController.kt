@@ -42,7 +42,7 @@ enum class AdminController(val value:String): WebSocketController {
          */
         override fun exec(request:JSONObject, session:Session?): JSONObject {
             var response = JSONObject()
-            val username = request["username"].toString();
+            val username = request["username"].toString()
             Logger.log(LogLevel.DEBUG, "Begin admin_get_users_list action. Username: $username. " +
                     "Remote IP: $sessionIP. Request: $request.","AdminController","admin_get_users_list.exec")
             var query = this.prepareListQuery(request,session)
@@ -431,6 +431,12 @@ enum class AdminController(val value:String): WebSocketController {
         val result = JSONObject()
         var fields = ArrayList<String>()
         val parser = JSONParser()
+        if (request.containsKey("get_total")) {
+            query["get_total"] = true
+        }
+        if (request.containsKey("get_presentations")) {
+            query["get_presentations"] = true
+        }
         if (request.containsKey("fields")) {
             var parseFieldsError = false;
             if (request["fields"] is String) {

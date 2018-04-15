@@ -123,9 +123,14 @@ class AdminControllerTests: WSEchoSocketDelegate {
         var request = defaultRequest
         request["action"] = "admin_get_users_list"
         request["offset"] = 2
+        request["get_total"] = true
+        request["get_presentations"] = true
         var response = AdminController.admin_get_users_list.exec(request)
         var list = response["list"] as JSONArray
+        var count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
         assertEquals("Should return limited users collection",4,list.count())
+        assertEquals("Should return correct total count of all items in collection",6,count)
         assertEquals("Should return correct fist item after apply offset","143Man",(list[0] as JSONObject)["login"].toString())
         assertEquals("Should return correct last item after apply offset","Josh",(list[list.count()-1] as JSONObject)["login"].toString())
     }
@@ -135,9 +140,14 @@ class AdminControllerTests: WSEchoSocketDelegate {
         var request = defaultRequest
         request["action"] = "admin_get_users_list"
         request["limit"] = 3
+        request["get_total"] = true
+        request["get_presentations"] = true
         var response = AdminController.admin_get_users_list.exec(request)
         var list = response["list"] as JSONArray
+        var count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
         assertEquals("Should return limited users collection",3,list.count())
+        assertEquals("Should return correct total count of all items in collection",6,count)
         assertEquals("Should return correct fist item after apply offset","Andrey",(list[0] as JSONObject)["login"].toString())
         assertEquals("Should return correct last item after apply offset","143Man",(list[list.count()-1] as JSONObject)["login"].toString())
     }
@@ -148,9 +158,14 @@ class AdminControllerTests: WSEchoSocketDelegate {
         request["action"] = "admin_get_users_list"
         request["offset"] = 2
         request["limit"] = 3
+        request["get_total"] = true
+        request["get_presentations"] = true
         var response = AdminController.admin_get_users_list.exec(request)
         var list = response["list"] as JSONArray
+        var count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
         assertEquals("Should return limited users collection",3,list.count())
+        assertEquals("Should return correct total count of all items in collection",6,count)
         assertEquals("Should return correct fist item after apply offset","143Man",(list[0] as JSONObject)["login"].toString())
         assertEquals("Should return correct last item after apply offset","john",(list[list.count()-1] as JSONObject)["login"].toString())
         request["limit"] = 10
@@ -165,25 +180,39 @@ class AdminControllerTests: WSEchoSocketDelegate {
         var request = defaultRequest
         request["action"] = "admin_get_users_list"
         request["filter"] = "gdfgdf"
+        request["get_total"] = true
+        request["get_presentations"] = true
         var response = AdminController.admin_get_users_list.exec(request)
         var list = response["list"] as JSONArray
+        var count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
         assertEquals("Should return nothing",0,list.count())
+        assertEquals("Should return correct count",0,count)
         request["filter"] = "a"
         response = AdminController.admin_get_users_list.exec(request)
         list = response["list"] as JSONArray
-        assertEquals("Should return correct number of items in case insensitive filter",2,list.count())
+        count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
+        assertEquals("Should return correct number of items in case insensitive filter",4,list.count())
         request["filter"] = "jo"
         response = AdminController.admin_get_users_list.exec(request)
         list = response["list"] as JSONArray
+        count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
         assertEquals("Should return correct number of items in case insensitive filter",2,list.count())
         request["filter"] = "2"
         response = AdminController.admin_get_users_list.exec(request)
         list = response["list"] as JSONArray
-        assertEquals("Should return correct number of items by filtering Integer field",3,list.count())
+        count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
+        assertEquals("Should return correct number of items by filtering Integer field",0,list.count())
         request["fields"] = "[\"login\",\"birthDate\"]"
+        request["filter"] = 14
         response = AdminController.admin_get_users_list.exec(request)
         list = response["list"] as JSONArray
-        assertEquals("Should return correct number of items by filtering only subset of fields",2,list.count())
+        count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
+        assertEquals("Should return correct number of items by filtering only subset of fields",1,list.count())
         request["fields"] = ArrayList<String>()
         response = AdminController.admin_get_users_list.exec(request)
         assertEquals("Should return error by filtering in empty fields list","error",response["status"].toString())
@@ -216,13 +245,13 @@ class AdminControllerTests: WSEchoSocketDelegate {
         request["sort"] = "{\"active\":\"ASC\"}"
         response = AdminController.admin_get_users_list.exec(request)
         list = response["list"] as JSONArray
-        assertEquals("Should sort Booleans correctly in ascending order",
-                "false,false,true,true,true,true",getFieldsString(list,"active"))
+        assertEquals("Should sort custom 'Active' field correctly in ascending order",
+                "true,true,true,true,false,false",getFieldsString(list,"active"))
         request["sort"] = "{\"active\":\"DESC\"}"
         response = AdminController.admin_get_users_list.exec(request)
         list = response["list"] as JSONArray
-        assertEquals("Should sort Booleans correctly in descending order",
-                "true,true,true,true,false,false",getFieldsString(list,"active"))
+        assertEquals("Should sort custom 'Active' field in descending order",
+                "false,false,true,true,true,true",getFieldsString(list,"active"))
         request["sort"] = "{\"active\":\"WEIRD\"}"
         response = AdminController.admin_get_users_list.exec(request)
         assertEquals("Should return error if sort order specified is not ASC or DESC",
@@ -249,6 +278,8 @@ class AdminControllerTests: WSEchoSocketDelegate {
         request["offset"] = 2
         request["limit"] = 3
         request["filter"] = "JO"
+        request["get_total"] = true
+        request["get_presentations"] = true
         ws_session.remote.sendString(toJSONString(request))
         Thread.sleep(500)
         val response = parser.parse(this.webSocketResponse) as JSONObject
@@ -258,6 +289,9 @@ class AdminControllerTests: WSEchoSocketDelegate {
         } else if (response["list"] is JSONArray){
             list = response["list"] as JSONArray
         }
+        val count = list[list.count()-1].toString().toInt()
+        list.removeAt(list.count()-1)
+        assertEquals("Should return list with correct total number of results",2,count)
         assertEquals("Should return list with correct number of items after applying all conditions",2,list.count())
         assertEquals("Should return items with correct sort order","Josh",(list[0] as JSONObject)["login"].toString())
     }
