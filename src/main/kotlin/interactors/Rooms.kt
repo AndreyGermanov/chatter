@@ -21,7 +21,7 @@ class Rooms(db: MongoDatabase, colName:String): DBCollection(db,colName) {
     override var schema = hashMapOf(
             "_id" to "String",
             "name" to "String"
-    ) as HashMap<String,String>
+    )
 
     /**
      * Used to load model from JSON document, using correct model type for this

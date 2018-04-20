@@ -19,6 +19,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
 
+@Suppress("NAME_SHADOWING")
 /**
  * Class represents iterable collection of chat users, based on MongoDB collection
  *
@@ -42,7 +43,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             "gender" to "String",
             "birthDate" to "Int",
             "role" to "Int"
-    ) as HashMap<String,String>
+    )
 
     val SALT_ROUNDS = 12
     val USER_ACTIVITY_TIMEOUT = 10
@@ -146,7 +147,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 callback(UserActivationResultCode.RESULT_ERROR_NO_USER)
             } else {
                 val user = obj as User
-                var active = false;
+                var active = false
                 if (user["active"] != null) {
                     active = user["active"] as Boolean
                 }
@@ -177,7 +178,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             callback(UserLoginResultCode.RESULT_ERROR_INCORRECT_PASSWORD,null)
         } else {
             var user = ChatApplication.users.getById(login) as? User
-            var loginBySessionId = false;
+            var loginBySessionId = false
             if (user!=null) {
                 val session = ChatApplication.sessions.getById(password) as? Session
                 if (session==null) {
@@ -189,7 +190,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                     callback(UserLoginResultCode.RESULT_ERROR_SESSION_TIMEOUT,null)
                     return
                 }
-                loginBySessionId = true;
+                loginBySessionId = true
             }
             if (user == null) {
                 user = ChatApplication.users.getBy("login",login) as? User
@@ -215,8 +216,8 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                     } else {
                         session = Session(db,"sessions",user)
                     }
-                    session!!["loginTime"] = currentTime
-                    session!!["lastActivityTime"] = currentTime
+                    session["loginTime"] = currentTime
+                    session["lastActivityTime"] = currentTime
                     if (user["default_room"] != null && app.rooms.getById(user["default_room"].toString())!=null) {
                         session["room"] = user["default_room"].toString()
                     }
@@ -244,7 +245,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             if (obj == null) {
                 callback(UserUpdateResultCode.RESULT_ERROR_USER_NOT_FOUND,"")
             } else {
-                var user = obj as User
+                val user = obj as User
                 if (params.contains("password")) {
                     if (params.get("password").toString().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY, "password")
@@ -271,13 +272,13 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY, "last_name")
                         return
                     } else {
-                        user["last_name"] = params.get("last_name").toString().trim();
+                        user["last_name"] = params.get("last_name").toString().trim()
                     }
                 }
                 if (params.contains("gender")) {
                     if (params.get("gender").toString().trim().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY,"gender")
-                        return;
+                        return
                     } else if (!listOf("M","F").contains(params.get("gender").toString().trim())) {
                         callback(UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE,"gender")
                         return
@@ -287,7 +288,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                 }
 
                 if (params.contains("birthDate")) {
-                    if (params.get("birthDate").toString().trim().isEmpty()) {
+                    if (params["birthDate"].toString().trim().isEmpty()) {
                         callback(UserUpdateResultCode.RESULT_ERROR_FIELD_IS_EMPTY,"birthDate")
                         return
                     } else {
@@ -296,8 +297,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
                             birthDate = params.get("birthDate").toString().trim().toInt()
                         } catch (e:Exception) {}
 
-                        if (birthDate==null ||
-                                birthDate==0 ||
+                        if (birthDate==0 ||
                                 Date(birthDate.toLong()*1000).after(Date(System.currentTimeMillis()))) {
                             callback(UserUpdateResultCode.RESULT_ERROR_INCORRECT_FIELD_VALUE,"birthDate")
                             return
@@ -351,7 +351,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
      * @returns Number of removed users
      */
     fun removeUsers(user_ids:ArrayList<String>):Int {
-        var result = 0;
+        var result = 0
         for (user_id in user_ids) {
             if (this.getById(user_id)==null) {
                 continue
@@ -361,13 +361,13 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             try {
                 Files.deleteIfExists(Paths.get(app.usersPath+"/"+user_id))
             } catch (e:Exception) {}
-            var sessions = ChatApplication.sessions.getListBy("user_id",user_id)
+            val sessions = ChatApplication.sessions.getListBy("user_id",user_id)
             if (sessions==null || sessions.count()==0) {
                 continue
             }
-            var it = sessions.iterator()
+            val it = sessions.iterator()
             while (it.hasNext()) {
-                var session = it.next() as? Session
+                val session = it.next() as? Session
                 if (session==null || session["_id"]==null) {
                     continue
                 }
@@ -380,9 +380,9 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
 
     /**
      * Function calculates string representation of field with provided [field_id]
-     * of provided [model]
+     * of provided [obj]
      *
-     * @param model: Model from which need to get field
+     * @param obj: Model from which need to get field
      * @param field_id: ID of field which need to extract and get representation
      * @return Human readable string representation of field value
      */
@@ -434,7 +434,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
             }
         }
         if (field_id == "birthDate") {
-            var birthDate:Long = 0
+            var birthDate:Long
             try {
                 birthDate = model["birthDate"].toString().toLong()
             } catch (e:Exception) {
@@ -596,16 +596,15 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         RESULT_ERROR_SESSION_TIMEOUT,
         RESULT_ERROR_UNKNOWN;
         fun getMessage(): String {
-            var result = ""
-            when (this) {
-                RESULT_ERROR_NOT_ACTIVATED -> result = "Please, activate this account. Open activation email."
-                RESULT_ERROR_INCORRECT_LOGIN -> result = "Incorrect login."
-                RESULT_ERROR_INCORRECT_PASSWORD -> result = "Incorrect password."
-                RESULT_ERROR_ALREADY_LOGIN -> result = "User already in the system."
-                RESULT_ERROR_UNKNOWN -> result = "Unknown error. Please contact support."
-                RESULT_ERROR_SESSION_TIMEOUT -> result = "Session timeout. Please, login again."
+            return when (this) {
+                RESULT_OK -> ""
+                RESULT_ERROR_NOT_ACTIVATED -> "Please, activate this account. Open activation email."
+                RESULT_ERROR_INCORRECT_LOGIN -> "Incorrect login."
+                RESULT_ERROR_INCORRECT_PASSWORD -> "Incorrect password."
+                RESULT_ERROR_ALREADY_LOGIN -> "User already in the system."
+                RESULT_ERROR_UNKNOWN -> "Unknown error. Please contact support."
+                RESULT_ERROR_SESSION_TIMEOUT -> "Session timeout. Please, login again."
             }
-            return result;
         }
     }
 
@@ -623,18 +622,17 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
         RESULT_ERROR_PASSWORDS_SHOULD_MATCH,
         RESULT_UNKNOWN;
         fun getMessage():String {
-            var result = ""
-            when(this) {
-                RESULT_OK -> result = "Settings update successfully."
-                RESULT_OK_PENDING_IMAGE_UPLOAD -> result = "Settings update successfully."
-                RESULT_ERROR_IMAGE_UPLOAD -> result = "Error upload profile image. Please try again."
-                RESULT_ERROR_USER_NOT_SPECIFIED -> result = "User not found. Please, contact support."
-                RESULT_ERROR_FIELD_IS_EMPTY -> result = "Field is required."
-                RESULT_ERROR_INCORRECT_FIELD_VALUE -> result = "Incorrect field value."
-                RESULT_ERROR_PASSWORDS_SHOULD_MATCH -> result = "Passwords should match."
-                RESULT_UNKNOWN -> result = "Unknown error. Please,contact support."
+            return when(this) {
+                RESULT_OK -> "Settings update successfully."
+                RESULT_OK_PENDING_IMAGE_UPLOAD -> "Settings update successfully."
+                RESULT_ERROR_IMAGE_UPLOAD -> "Error upload profile image. Please try again."
+                RESULT_ERROR_USER_NOT_SPECIFIED -> "User not found. Please, contact support."
+                RESULT_ERROR_FIELD_IS_EMPTY -> "Field is required."
+                RESULT_ERROR_INCORRECT_FIELD_VALUE -> "Incorrect field value."
+                RESULT_ERROR_PASSWORDS_SHOULD_MATCH -> "Passwords should match."
+                RESULT_ERROR_USER_NOT_FOUND -> "User with specified ID not found."
+                RESULT_UNKNOWN -> "Unknown error. Please,contact support."
             }
-            return result
         }
     }
 
@@ -650,7 +648,7 @@ class Users(db: MongoDatabase, colName:String = "users"): DBCollection(db,colNam
              *
              * @return UserRole
              */
-            public fun getValueByCode(code:Int):UserRole {
+            fun getValueByCode(code:Int):UserRole {
                 var result = USER
                 when (code) {
                     1 -> result = USER

@@ -41,17 +41,17 @@ enum class AdminController(val value:String): WebSocketController {
          *          and offset
          */
         override fun exec(request:JSONObject, session:Session?): JSONObject {
-            var response = JSONObject()
+            val response = JSONObject()
             val username = request["username"].toString()
             Logger.log(LogLevel.DEBUG, "Begin admin_get_users_list action. Username: $username. " +
                     "Remote IP: $sessionIP. Request: $request.","AdminController","admin_get_users_list.exec")
-            var query = this.prepareListQuery(request,session)
+            val query = this.prepareListQuery(request,session)
             if (query.containsKey("status") && query["status"] == "error") {
                 return query
             }
             Logger.log(LogLevel.DEBUG,"Prepared query to users collection: $query. Username: $username," +
                     "Remote IP: $sessionIP, request: $request","AdminController","admin_get_users_list.exec")
-            var usersArray = ChatApplication.users.getListJSON(query)
+            val usersArray = ChatApplication.users.getListJSON(query)
             Logger.log(LogLevel.DEBUG,"Prepared list for admin_get_users_list request. Username: $username," +
                     "Remote IP: $sessionIP, Request: $request, List: $usersArray","AdminController",
                     "admin_get_users_list.exec")
@@ -82,9 +82,9 @@ enum class AdminController(val value:String): WebSocketController {
         override fun exec(request:JSONObject,session:Session?):JSONObject {
             val logInfo = "Username: $username,Remote IP: $sessionIP. Request: $request"
             Logger.log(LogLevel.DEBUG,"Begin admin_get_user_request. " +
-                    "$logInfo", "AdminController","admin_get_user.exec")
-            var response = JSONObject()
-            var condition_json = toJSONObject(request["query"])
+                    logInfo, "AdminController","admin_get_user.exec")
+            val response = JSONObject()
+            val condition_json = toJSONObject(request["query"])
             response["status"] = "error"
             response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_INCORRECT_FIELD_VALUE
             response["field"] = "query"
@@ -93,7 +93,7 @@ enum class AdminController(val value:String): WebSocketController {
                         "AdminController","admin_get_user.exec")
                 return response
             }
-            var condition = JSONToPair(condition_json)
+            val condition = JSONToPair(condition_json)
             if (condition == null) {
                 Logger.log(LogLevel.WARNING,"Incorrect query format. Query: $condition_json. $logInfo",
                         "AdminController","admin_get_user.exec")
@@ -142,8 +142,8 @@ enum class AdminController(val value:String): WebSocketController {
             val logInfo = "Username: $username,Remote IP: $sessionIP. Request: $request"
             Logger.log(LogLevel.DEBUG,"Begin admin_add_user request handler. $logInfo",
                     "AdminController","admin_add_user.exec")
-            var response = JSONObject()
-            var fields:JSONArray?
+            val response = JSONObject()
+            val fields:JSONArray?
             val parse_response = parseJSONArrayFromRequest(request,"fields",session)
             if (parse_response["status"].toString() == "ok") {
                 fields = parse_response["result"] as JSONArray
@@ -166,7 +166,7 @@ enum class AdminController(val value:String): WebSocketController {
                 ChatApplication.users.addModel(result)
                 response["status"] = "ok"
                 response["status_code"] = AdminControllerRequestResults.RESULT_OK
-                var user_obj = result.toJSON()
+                val user_obj = result.toJSON()
                 Logger.log(LogLevel.DEBUG,"Prepared JSON object from user model to return: $user_obj. $logInfo",
                         "AdminController","admin_add_user.exec")
                 if (user_obj.containsKey("password")) {
@@ -195,8 +195,8 @@ enum class AdminController(val value:String): WebSocketController {
             val logInfo = "Username: $username,Remote IP: $sessionIP. Request: $request"
             Logger.log(LogLevel.DEBUG,"Begin admin_update_user request handler. $logInfo",
                     "AdminController","admin_update_user.exec")
-            var response = JSONObject()
-            var fields:JSONArray?
+            val response = JSONObject()
+            val fields:JSONArray?
             val parse_response = parseJSONArrayFromRequest(request,"fields",session)
             if (parse_response["status"].toString() == "ok") {
                 fields = parse_response["result"] as JSONArray
@@ -205,7 +205,7 @@ enum class AdminController(val value:String): WebSocketController {
                         "AdminController","admin_update_user.exec")
                 return parse_response
             }
-            var user_id = ""
+            var user_id:String
             if (!request.containsKey("id") || request["id"]==null) {
                 Logger.log(LogLevel.WARNING,"User to modify 'id' not specified $logInfo",
                         "AdminController","admin_update_user.exec")
@@ -229,7 +229,7 @@ enum class AdminController(val value:String): WebSocketController {
                 (ChatApplication.users.getById(user_id) as User).doc = result.doc
                 response["status"] = "ok"
                 response["status_code"] = AdminControllerRequestResults.RESULT_OK
-                var user_obj = result.toJSON()
+                val user_obj = result.toJSON()
                 Logger.log(LogLevel.DEBUG,"Prepared JSON object from user model to return: $user_obj. $logInfo",
                         "AdminController","admin_update_user.exec")
                 if (user_obj.containsKey("password")) {
@@ -262,10 +262,10 @@ enum class AdminController(val value:String): WebSocketController {
                 response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
                 response["field"] = "list"
                 Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty. " +
-                        "$logInfo", "AdminController,","admin_remove_users.exec")
+                        logInfo, "AdminController,","admin_remove_users.exec")
                 return response
             }
-            var list:JSONArray?
+            val list:JSONArray?
             val parse_response = parseJSONArrayFromRequest(request,"list",session)
             if (parse_response["status"].toString() == "ok") {
                 list = parse_response["result"] as JSONArray
@@ -291,7 +291,7 @@ enum class AdminController(val value:String): WebSocketController {
                 response["status_code"] = AdminControllerRequestResults.RESULT_ERROR_FIELD_IS_EMPTY
                 response["field"] = "list"
                 Logger.log(LogLevel.WARNING,"admin_remove_users action requires 'list argument, but it's empty. " +
-                        "$logInfo","AdminController", "admin_remove_users.exec")
+                        logInfo,"AdminController", "admin_remove_users.exec")
                 return response
             }
             Logger.log(LogLevel.DEBUG,"Prepared list of users to remove: $user_ids. Removing ... $logInfo",
@@ -328,7 +328,7 @@ enum class AdminController(val value:String): WebSocketController {
             val logInfo =  "Username: $username. Remote IP: $sessionIP. Request: $request"
             Logger.log(LogLevel.DEBUG, "Begin admin_send_activation_email action. $logInfo",
                     "AdminController","admin_send_activation_email.exec")
-            var response = JSONObject()
+            val response = JSONObject()
             response["status"] = "error"
             response["field"] = "id"
             if (!request.containsKey("id") || request["id"] !is String || request["id"].toString().isEmpty()) {
@@ -358,8 +358,51 @@ enum class AdminController(val value:String): WebSocketController {
                     "AdminController","admin_send_activation_email.exec")
             return response
         }
+    },
+    /**
+     * Action used to return list of rooms as JSON Object
+     */
+    admin_get_rooms_list("admin_get_rooms_list") {
+        /**
+         * Action executor.
+         *
+         * @param request: Can contain following optional fields
+         *                  fields - which fields to return (JSON Array of field names)
+         *                  filter - filtering string for data. (Only fields in "fields" array checked)
+         *                  offset - offset from which row to return (after applying filter)
+         *                  limit - how many rows to return after applying filter and offset
+         * @param session: Link to client WebSocket session instance
+         * @return JSONObject with result of operation. Contains following fields:
+         *          status - "ok" or "error"
+         *          status_code - one of values of "AdminControllerRequestResults" enumeration
+         *          field - if error related to one of fields, here this field specified
+         *          list - list of rooms, after applying condition,limit and offset
+         *          total_count - total count of items in users collection, before applying condition,limit
+         *          and offset
+         */
+        override fun exec(request: JSONObject, session: Session?): JSONObject {
+            val response = JSONObject()
+            val username = request["username"].toString()
+            Logger.log(LogLevel.DEBUG, "Begin admin_get_rooms_list action. Username: $username. " +
+                    "Remote IP: $sessionIP. Request: $request.", "AdminController", "admin_get_rooms_list.exec")
+            val query = this.prepareListQuery(request, session)
+            if (query.containsKey("status") && query["status"] == "error") {
+                return query
+            }
+            Logger.log(LogLevel.DEBUG, "Prepared query to rooms collection: $query. Username: $username," +
+                    "Remote IP: $sessionIP, request: $request", "AdminController", "admin_get_rooms_list.exec")
+            val roomsArray = ChatApplication.rooms.getListJSON(query)
+            Logger.log(LogLevel.DEBUG, "Prepared list for admin_get_rooms_list request. Username: $username," +
+                    "Remote IP: $sessionIP, Request: $request, List: $roomsArray", "AdminController",
+                    "admin_get_rooms_list.exec")
+            if (roomsArray.count() >= 0) {
+                response["status"] = "ok"
+                response["status_code"] = AdminControllerRequestResults.RESULT_OK
+                response["list"] = roomsArray
+            }
+            return response
+        }
     };
-
     override var user: models.User? = null
     override var username: String = ""
     override var sessionIP = ""
@@ -419,7 +462,8 @@ enum class AdminController(val value:String): WebSocketController {
      * either return validation error, or prepared query to pass to underlying function getListJSON() of
      * underlying DB collection
      *
-     * @param request - Request, which can contain fields "limit", "offset", "filter", "fields" and "sort"
+     * @param request - Request, which can contain fields "limit", "offset", "filter", "fields", "sort", "get_total",
+     * "get_presentations"
      * @param session - Link to Client WebSocket session
      * @return Depends on validation result. If failed validation, returns standard error response with fields
      * "status" = "error", "status_code" - AdminControllerResultCode and "field" = (limit,offset,filter,fields,sort).
@@ -438,21 +482,19 @@ enum class AdminController(val value:String): WebSocketController {
             query["get_presentations"] = true
         }
         if (request.containsKey("fields")) {
-            var parseFieldsError = false;
-            if (request["fields"] is String) {
-                try {
+            var parseFieldsError = false
+            when {
+                request["fields"] is String -> try {
                     fields = parser.parse(request["fields"].toString()) as ArrayList<String>
                 } catch (e: Exception) {
                     parseFieldsError = true
                 }
-            } else if (request["fields"] is ArrayList<*>) {
-                try {
+                request["fields"] is ArrayList<*> -> try {
                     fields = request["fields"] as ArrayList<String>
                 } catch (e: Exception) {
-                    parseFieldsError = true;
+                    parseFieldsError = true
                 }
-            } else {
-                parseFieldsError = true;
+                else -> parseFieldsError = true
             }
             if (parseFieldsError) {
                 Logger.log(LogLevel.WARNING, "Could not parse 'fields' field of request to JSON." +
@@ -573,7 +615,7 @@ enum class AdminController(val value:String): WebSocketController {
                 } else {
                     for ((index,value) in sort) {
                         if (value.toString() != "ASC" && value.toString()!="DESC") {
-                            failedSort = true;
+                            failedSort = true
                             Logger.log(LogLevel.WARNING,"Incorrect sort field direction - ${value.toString()}. " +
                                     "Should be ASC or DESC. Username: $username,Remote IP: $sessionIP, Request: " +
                                     "$request","AdminController","prepareListQuery")
@@ -606,9 +648,9 @@ enum class AdminController(val value:String): WebSocketController {
      * @return model filled with field values after validation
      */
     fun <T: DBModel> createModel(obj:T,fields:JSONArray):JSONObject {
-        var model = toJSONObject(obj.doc.toJson())!!
+        val model = toJSONObject(obj.doc.toJson())!!
         val logInfo = "Username: $username,Remote IP: $sessionIP."
-        var fields_iterator = fields.iterator()
+        val fields_iterator = fields.iterator()
         while (fields_iterator.hasNext()) {
             val field_object = fields_iterator.next()
             val field = toJSONObject(field_object)
@@ -688,8 +730,8 @@ enum class AdminController(val value:String): WebSocketController {
         val logInfo = "Username: $username,Remote IP: $sessionIP."
         Logger.log(LogLevel.DEBUG,"Validating fields: $fields. " +
                 " $logInfo","AdminController","validateFields")
-        var error = JSONObject()
-        var initial_user:User?
+        val error = JSONObject()
+        val initial_user:User?
         var initial_login:String? = null
         var initial_email:String? = null
         if (id==null) {
@@ -828,7 +870,7 @@ enum class AdminController(val value:String): WebSocketController {
         }
         Logger.log(LogLevel.DEBUG,"No validation errors during validation. Object constructed: $user. " +
                 " $logInfo","AdminController","validateFields")
-        var model = User(ChatApplication.dBServer.db,"users")
+        val model = User(ChatApplication.dBServer.db,"users")
         model.doc = Document.parse(toJSONString(user))
         return model
     }
@@ -863,15 +905,14 @@ enum class AdminControllerRequestResults(value:String) {
     RESULT_ERROR_EMPTY_RESULT("RESULT_ERROR_EMPTY_RESUT"),
     RESULT_ERROR_OBJECT_NOT_FOUND("RESULT_ERROR_OBJECT_NOT_FOUND");
     fun getMessage():String {
-        var result = ""
-        when(this) {
-            RESULT_OK -> result = ""
-            RESULT_ERROR_FIELD_IS_EMPTY -> result = "Field is empty"
-            RESULT_ERROR_INCORRECT_FIELD_VALUE -> result = "Incorrect field value"
-            RESULT_ERROR_EMPTY_RESULT -> result = "Result is empty"
-            RESULT_ERROR_OBJECT_NOT_FOUND -> result = "Object not found"
+        return when(this) {
+            RESULT_OK -> ""
+            RESULT_ERROR_FIELD_IS_EMPTY -> "Field is empty"
+            RESULT_ERROR_INCORRECT_FIELD_VALUE -> "Incorrect field value"
+            RESULT_ERROR_EMPTY_RESULT -> "Result is empty"
+            RESULT_ERROR_OBJECT_NOT_FOUND -> "Object not found"
+            RESULT_ERROR_FIELD_ALREADY_EXISTS -> "Field with this value already exists"
         }
-        return result
     }
 }
 

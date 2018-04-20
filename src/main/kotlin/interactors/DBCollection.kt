@@ -19,10 +19,10 @@ import utils.LogLevel
 import utils.Logger
 
 /**
- *   Base class of collection of database models of type [T] based on DBModel
+ *   Base class of collection of database models
  *
  *  @param db MongoDB database instance, which holds collection
- *  @param colname Name of MongoDB collection
+ *  @param colName Name of MongoDB collection
  *
  *  @property db MongoDB database instance, which holds collection
  *  @property collectionName name of MongoDB collection
@@ -57,10 +57,9 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             doc["_id"] = ObjectId.get()
         }
         val model = DBModel(db,collectionName)
+        model.schema = this.schema
         if (schema != null) {
             model.schema = schema
-        } else if (this.schema != null) {
-            model.schema = this.schema!!
         }
         model.addFromJSON(doc,this)
     }
@@ -71,9 +70,9 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     *   @param model Model to add
     */
     open fun addModel(model:Any) {
-        var dbmodel = model as DBModel
-        var items = models.filter {
-            var item = it as DBModel
+        val dbmodel = model as DBModel
+        val items = models.filter {
+            val item = it as DBModel
             item["_id"] == dbmodel["_id"]
         }
         if (items.count() == 0) {
@@ -94,7 +93,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     open fun loadList(condition: Document?, callback:()->Unit) {
         val col = db.getCollection(collectionName)
         models.clear()
-        var result: FindIterable<Document>
+        val result: FindIterable<Document>
         if (condition != null) {
             result = col.find(condition)
         } else {
@@ -126,9 +125,11 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      *          get_presentations: if specified, will use field presentations if field string presentation for field
      *          differs from real database value . In this case "filter" will be applied to presentation of field,
      *          not to actual field value
+     * @param condition: Condition or set of conditions in MongoDB Document format, used to set additional filter to
+     * returned list. If specified, then function first applies "condition" and then applies "params" to resulting set
      * @return ArrayList with all models, which meet criteria
     */
-    fun getList(params:JSONObject?=null):ArrayList<Any> {
+    fun getList(params:JSONObject?=null,condition:Document? = null):ArrayList<Any> {
         var filter = ""
         var fields:ArrayList<String>? = null
         var limit = 0
@@ -136,6 +137,9 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
         var getTotal = false
         var getPresentations = false
         var sort:Pair<String,String>? = null
+        if (condition!=null) {
+            this.loadList(condition) {}
+        }
         if (params!=null) {
             filter = params["filter"]?.toString() ?: ""
             if (params["fields"] is ArrayList<*>) {
@@ -149,7 +153,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             getTotal = params["get_total"] != null
             getPresentations = params["get_presentations"] != null
         }
-        var results = ArrayList<Any>()
+        val results = ArrayList<Any>()
         if (!filter.isEmpty()) {
             this.models.map { it as DBModel }.forEach {
                 for ((field,_) in schema) {
@@ -182,9 +186,9 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             if (endIndex == 0 || endIndex>results.size || limit == 0) {
                 endIndex = results.size
             }
-            var sublist = results.subList(offset,endIndex)
+            val sublist = results.subList(offset,endIndex)
             if (sublist.count()>0) {
-                var subListArray = ArrayList<Any>()
+                val subListArray = ArrayList<Any>()
                 subListArray.addAll(sublist)
                 if (getTotal) {
                     subListArray.add(count)
@@ -229,7 +233,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             val jsonObj = JSONObject()
             val model = modelObj as? DBModel
             if (model==null) {
-                var count = 0
+                var count:Int
                 try {
                     count = modelObj.toString().toInt()
                     results.add(count)
@@ -241,7 +245,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
             }
             for ((field_index,_) in schema) {
                 if (model[field_index]!=null && (fields==null || fields.contains(field_index)) && field_index!="password") {
-                    var field_presentation = getFieldPresentation(model,field_index)
+                    val field_presentation = getFieldPresentation(model,field_index)
                     jsonObj[field_index] = model[field_index]
                     if (getPresentations && field_presentation != model[field_index].toString())  {
                         jsonObj[field_index+"_text"] = field_presentation
@@ -260,14 +264,14 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
 
     /**
      * Function calculates string representation of field with provided [field_id]
-     * of provided [model]
+     * of provided [obj]
      *
      * @param obj: Model from which need to get field
      * @param field_id: ID of field which need to extract and get representation
      * @return Human readable string representation of field value
      */
     open fun getFieldPresentation(obj: Any,field_id:String):String {
-        var model = obj as? DBModel
+        val model = obj as? DBModel
         if (model == null) {
             Logger.log(LogLevel.WARNING, "Could not convert object to model to get text representation " +
                     "for field '$field_id'", "DBCollection","getFieldPresentation")
@@ -282,10 +286,10 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     }
 
     /**
-     * Function calculates sort order for models [model1] and [model2] when sorting using [sort_order] param
+     * Function calculates sort order for models [obj1] and [obj2] when sorting using [sort_order] param
      *
-     * @param model1: First model
-     * @param model2: Second model
+     * @param obj1: First model
+     * @param obj2: Second model
      * @param sortOrder: Pair<String,String> which contains sorting rule. First part is field_id,second part is
      * sort direction: ASC or DESC
      * @returns When sort order is ASC, returns 1 if obj1>obj2, -1 if obj1<obj2 and 0 if they are equals
@@ -293,8 +297,8 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      *          Else returns null in case of error during operation
      */
     open fun getSortOrder(obj1:Any, obj2:Any,sortOrder:Pair<String,String>): Int? {
-        var model1 = obj1 as? DBModel
-        var model2 = obj2 as? DBModel
+        val model1 = obj1 as? DBModel
+        val model2 = obj2 as? DBModel
         if (model1 == null) {
             Logger.log(LogLevel.WARNING,"Object 1 ($obj1) is not correct database model",
                     "DBCollection","getSortOrder")
@@ -305,13 +309,13 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
                     "DBCollection","getSortOrder")
             return null
         }
-        var sortField = sortOrder.first
-        var sortType = schema[sortOrder.first].toString()
+        val sortField = sortOrder.first
+        val sortType = schema[sortOrder.first].toString()
         var corrector = 1
         if (sortOrder.second == "DESC") {
             corrector = -1
         }
-        var result = 0
+        var result:Int
         when (sortType) {
             "Double" -> {
                 var v1 = 0.0
@@ -353,8 +357,8 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
                 var v1 = false
                 var v2 = false
                 try {
-                    v1 = model1[sortField].toString()?.toBoolean() ?: false
-                    v2 = model2[sortField].toString()?.toBoolean() ?: false
+                    v1 = model1[sortField].toString().toBoolean()
+                    v2 = model2[sortField].toString().toBoolean()
                 } catch (e:Exception) {
                     Logger.log(LogLevel.WARNING,"Could not convert values of field $sortField to Boolean " +
                             "for sorting: ${model1[sortField]},${model2[sortField]}","DBCollection","getList")
@@ -368,8 +372,8 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
                 }
             }
             else -> {
-                var v1 = model1[sortField]?.toString()?.toLowerCase() ?: ""
-                var v2 = model2[sortField]?.toString()?.toLowerCase() ?: ""
+                val v1 = model1[sortField]?.toString()?.toLowerCase() ?: ""
+                val v2 = model2[sortField]?.toString()?.toLowerCase() ?: ""
                 if (v1>v2) {
                     result =1*corrector
                 } else if (v1<v2) {
@@ -429,14 +433,14 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      *  @return model with specified _id
      */
     fun getById(id:String): Any? {
-        var result = models.filter{
+        val result = models.filter{
             val obj = it as DBModel
             obj.get("_id").toString() == id
         }
-        if (result.count() == 1) {
-            return result.first()
+        return if (result.count() == 1) {
+            result.first()
         } else {
-            return null
+            null
         }
     }
 
@@ -450,12 +454,12 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
     fun getListBy(field:String,value:Any): ArrayList<Any>? {
         val result = models.filter {
             val model = it as DBModel
-            it[field] == value
+            model[field] == value
         }
-        if (result.count() > 0) {
-            return result as ArrayList<Any>
+        return if (result.count() > 0) {
+            result as ArrayList<Any>
         } else {
-            return null
+            null
         }
     }
 
@@ -517,7 +521,7 @@ open class DBCollection(db:MongoDatabase,colName:String=""): Iterator<Any> {
      * @return String representation of collection (JSON with _id's)
      */
     override fun toString() : String {
-        var it = models.iterator()
+        val it = models.iterator()
         val result = JSONArray()
         for (obj in it) {
             val model = obj as DBModel
